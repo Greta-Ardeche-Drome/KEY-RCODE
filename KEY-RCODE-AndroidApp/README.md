@@ -3,7 +3,7 @@
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
-In order to be able to modify the Android app you need to:
+In order to be able to start to modify the Android app you need to:
 
 1. Install dependencies
 
