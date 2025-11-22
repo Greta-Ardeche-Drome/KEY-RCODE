@@ -9,6 +9,7 @@ In order to be able to start to modify the Android app you need to:
 
    ```bash
    npm install
+   npm install -g expo-cli
    ```
 2. Clone this repo
 
@@ -16,8 +17,8 @@ In order to be able to start to modify the Android app you need to:
 
    ```bash
    npx expo start
+   #Puis choix A#
    npm run android
-   npx expo start
    ```
 
 In the output, you'll find options to open the app in a
