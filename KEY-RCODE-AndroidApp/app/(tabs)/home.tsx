@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Logo from '../../assets/images/keyrcode-logo.png';
 
 export default function Home() {
   const router = useRouter();
@@ -11,7 +12,7 @@ export default function Home() {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.logo}>🔐</Text>
+          <Image source={Logo} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>KEY-RCODE</Text>
           <Text style={styles.subtitle}>Votre générateur de QR Code</Text>
         </View>
@@ -53,8 +54,7 @@ export default function Home() {
             </TouchableOpacity>
           </View>
         </View>
-
-        
+       
       </View>
     </SafeAreaView>
   );
@@ -70,21 +70,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#6f96ffff',
     paddingVertical: 40,
     paddingHorizontal: 20,
     alignItems: 'center',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    shadowColor: '#3B82F6',
+    shadowColor: '#007d77',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 8,
-  },
-  logo: {
-    fontSize: 60,
-    marginBottom: 10,
   },
   title: {
     fontSize: 32,
@@ -133,11 +129,11 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   primaryButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#32cf75',
     paddingVertical: 18,
     paddingHorizontal: 50,
     borderRadius: 15,
-    shadowColor: '#3B82F6',
+    shadowColor: '#007d77',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
@@ -179,5 +175,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9CA3AF',
     textAlign: 'center',
+  },
+  logo: {
+    width: 160,    // Largeur souhaitée
+    height: 160,   // Hauteur souhaitée
+    marginBottom: -20,
   },
 });
