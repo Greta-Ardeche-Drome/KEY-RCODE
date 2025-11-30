@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { UserProvider } from ".././UserContext";
 
 type QRCodeGeneratorProps = {
   token: string;

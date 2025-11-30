@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Logo from '../../assets/images/keyrcode-logo.png';
+import { UserProvider } from ".././UserContext";
 
 export default function Home() {
   const router = useRouter();
