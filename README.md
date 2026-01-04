@@ -8,13 +8,13 @@
 
 ### 🛠️ Tech Stack
 
-**Development : ** 
+Development :
 
 ![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![NodeJS](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
-**Infrastructure & Ops : **
+Infrastructure & Ops :
 
 ![Windows Server](https://img.shields.io/badge/Windows%20Server-2025-0078D7?style=for-the-badge&logo=windows&logoColor=white)
 ![Debian](https://img.shields.io/badge/Debian-13-A81D33?style=for-the-badge&logo=debian&logoColor=white)
@@ -55,6 +55,7 @@ The infrastructure is consolidated on a single physical host running Hyper-V wit
 
 ---
 *Academic Project - BUT R&T 2025-2026 - IUT de Valence.*
+
 
 
 
