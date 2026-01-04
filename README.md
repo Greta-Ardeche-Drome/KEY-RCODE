@@ -42,7 +42,7 @@ The infrastructure is consolidated on a single physical host running Hyper-V wit
 | :--- | :--- | :--- | :--- |
 | **KRC AD** (`SRV-AD01`) | Identity | Win Srv 2025 | Centralized LDAP directory & DNS. |
 | **KRC SQL** (`SRV-SQL01`) | Data | Debian 13 | Secure storage for logs & tokens. |
-| **KRC BACKEND** (`SRV-WEB01`) | API | Debian 12 | Node.js/Python Orchestrator. |
+| **KRC BACKEND** (`SRV-WEB01`) | API | Debian 13 | Node.js/Python Orchestrator. |
 
 ## 👥 Project Team
 
@@ -53,4 +53,5 @@ The infrastructure is consolidated on a single physical host running Hyper-V wit
 
 ---
 *Academic Project - BUT R&T 2025-2026 - IUT de Valence.*
+
 
