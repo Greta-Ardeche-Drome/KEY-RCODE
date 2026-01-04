@@ -1,6 +1,6 @@
 # 🔑 KEY-R CODE
 
-![Banner](https://via.placeholder.com/1000x300/003545/FFFFFF?text=KEY-R+CODE+Project)
+![Banner](img/banner.png)
 
 > **Project aiming to create a secure QR-Code–based electronic access system powered by a Raspberry Pi controlling an electric strike. The prototype includes an authentication API, a mobile application, and a rights-management database to replace manual key handling. Using Node.js, React Native, and much more.**
 
@@ -53,3 +53,4 @@ The infrastructure is consolidated on a single physical host running Hyper-V wit
 
 ---
 *Academic Project - BUT R&T 2025-2026 - IUT de Valence.*
+
