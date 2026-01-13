@@ -77,8 +77,40 @@ export default function Details() {
     }
   };
 
-  const disconnect = () => {
-    setToken('');
+  const disconnect = async () => {
+    // 1. On signale le chargement (optionnel, pour l'UX)
+    setIsLoading(true);
+
+    try {
+      // 2. On envoie l'ordre d'ouverture au serveur
+      // IP DU SERVEUR A REMPLACER CI-DESSOUS !
+      const response = await fetch('http://192.168.1.250:3000/api/v1/open-door', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          userId: userId, // On dit au serveur QUI sort
+          action: 'exit' 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert("Sortie autorisée", "La porte est ouverte. Au revoir ! 👋");
+      } else {
+        Alert.alert("Erreur", "Impossible d'ouvrir la porte automatiquement.");
+      }
+
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erreur Réseau", "Impossible de contacter le serveur pour l'ouverture.");
+    } finally {
+      // Déconnexion de l'utilisateur 
+      setToken('');
+      setIsLoading(false);
+    }
   };
 
   return (
