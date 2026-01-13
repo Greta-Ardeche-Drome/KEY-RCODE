@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { UserProvider } from ".././UserContext";
 
@@ -34,16 +34,50 @@ const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
 };
 export default function Details() {
   const [token, setToken] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   // Exemple : ID utilisateur statique ou récupéré depuis un contexte
-  const userId = "001"; // Remplace par la récupération réelle de l'ID utilisateur
+  const userId = "001"; // Remplacer par la récupération réelle de l'ID utilisateur
 
-  const generateToken = () => {
+  const generateToken = async () => {
     const timestamp = Date.now();
-    // Inclut l'ID utilisateur dans le token
-    setToken(`TOKEN_KRC-${timestamp}-UID${userId}`);
+    // 1. On lance le chargement
+    setIsLoading(true);
+
+    try {
+      // 2. On prépare les données à envoyer
+      const payload = {
+        userId: userId // On envoie l'ID "001"
+      };
+      // 3. Envoi de la requête au Backend
+      // REMPLACE BIEN L'IP CI-DESSOUS !
+      const response = await fetch('http://192.168.1.250:3000/api/v1/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      // 4. Vérification de la réponse
+      if (response.ok && data.success) {
+        setToken(data.token); // On met à jour le QR Code
+        // Optionnel : Alert.alert("Succès", "Token généré !");
+      } else {
+        Alert.alert("Erreur", data.message || "Le serveur a refusé la demande.");
+      }
+
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erreur Réseau", "Impossible de contacter le serveur. Vérifiez votre connexion.");
+    } finally {
+      // 5. On arrête le chargement quoi qu'il arrive
+      setIsLoading(false);
+    }
   };
 
-  const resetToken = () => {
+  const disconnect = () => {
     setToken('');
   };
 
@@ -74,10 +108,10 @@ export default function Details() {
           {token && (
             <TouchableOpacity
               style={[styles.button, styles.secondaryButton]}
-              onPress={resetToken}
+              onPress={disconnect}
               activeOpacity={0.8}
             >
-              <Text style={styles.secondaryButtonText}>🔄 Réinitialiser</Text>
+              <Text style={styles.secondaryButtonText}>🔄 Sortie</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -184,7 +218,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   secondaryButton: {
-    backgroundColor: '#818dffff',
+    backgroundColor: '#ff0000ff',
     borderWidth: 2,
     borderColor: '#E5E7EB',
   },
