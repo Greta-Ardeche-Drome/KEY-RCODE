@@ -27,3 +27,6 @@ export const UserProvider = ({ children }: any) => {
 };
 
 export const useUser = () => useContext(UserContext);
+
+// Default export for Expo Router
+export default UserProvider;
