@@ -50,7 +50,7 @@ export default function Details() {
       };
       // 3. Envoi de la requête au Backend
       // REMPLACE BIEN L'IP CI-DESSOUS !
-      const response = await fetch('http://192.168.1.250:3000/api/v1/generate', {
+      const response = await fetch('http://192.168.1.13:3000/api/v1/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,7 +84,7 @@ export default function Details() {
     try {
       // 2. On envoie l'ordre d'ouverture au serveur
       // IP DU SERVEUR A REMPLACER CI-DESSOUS !
-      const response = await fetch('http://192.168.1.250:3000/api/v1/open-door', {
+      const response = await fetch('http://192.168.1.13:3000/api/v1/open-door', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
