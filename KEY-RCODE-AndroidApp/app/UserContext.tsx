@@ -1,5 +1,6 @@
-import React, { useContext, createContext, type PropsWithChildren } from 'react';
+import React, { useContext, createContext, type PropsWithChildren, useEffect } from 'react';
 import { useStorageState } from './useStorageState';
+import { useRouter } from 'expo-router';
 
 type UserData = {
   username: string;
@@ -34,20 +35,33 @@ export function useSession() {
 export function UserProvider({ children }: PropsWithChildren) {
   const [[isLoading, session], setSession] = useStorageState('session_token');
   const [user, setUser] = React.useState<UserData | null>(null);
+  const router = useRouter();
+
+  // signOut effectue le logout et la redirection une seule fois
+  const signOut = React.useCallback(() => {
+    setSession(null);
+    setUser(null);
+    router.replace('/login');
+  }, [router, setSession]);
+
+  // Vérifie l'état d'authentification uniquement pour les cas automatiques (ex: session expirée)
+  useEffect(() => {
+    if (!isLoading && (!session || !user || user.email === 'email@domaine.fr')) {
+      // Ne pas appeler signOut si déjà sur login
+      if (router.pathname !== '/login') {
+        signOut();
+      }
+    }
+  }, [isLoading, session, user, signOut, router.pathname]);
 
   return (
     <AuthContext.Provider
       value={{
         signIn: (token, userData) => {
-          // On sauvegarde le token de manière persistante (SecureStore)
           setSession(token);
-          // On garde les infos utilisateur en mémoire
           setUser(userData);
         },
-        signOut: () => {
-          setSession(null);
-          setUser(null);
-        },
+        signOut,
         session,
         isLoading,
         user

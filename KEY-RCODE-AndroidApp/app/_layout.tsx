@@ -2,26 +2,25 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { UserProvider, useSession } from './UserContext';
 import { View, ActivityIndicator } from 'react-native';
+import { DarkModeProvider } from './(tabs)/profile'; // Import du provider
 
 function InitialLayout() {
-  const { session, isLoading } = useSession();
+  const { session, isLoading, user } = useSession();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
     if (isLoading) return;
 
-    // Vérifie si l'utilisateur essaie d'accéder aux onglets protégés
     const inTabsGroup = segments[0] === '(tabs)';
+    const notLogged = !session || !user || user.email === 'email@domaine.fr';
 
-    if (!session && inTabsGroup) {
-      // Pas de session + tentative d'accès aux tabs -> Login obligatoire
+    if (notLogged && inTabsGroup) {
       router.replace('/login');
-    } else if (session && segments[0] === 'login') {
-      // Session active + tentative d'accès au login -> Redirection vers Home
+    } else if (!notLogged && segments[0] === 'login') {
       router.replace('/(tabs)/home');
     }
-  }, [session, segments, isLoading]);
+  }, [session, user, segments, isLoading]);
 
   if (isLoading) {
     return (
@@ -31,14 +30,15 @@ function InitialLayout() {
     );
   }
 
-  // Affiche l'écran demandé (Login ou Tabs)
   return <Slot />;
 }
 
 export default function RootLayout() {
   return (
-    <UserProvider>
-      <InitialLayout />
-    </UserProvider>
+    <DarkModeProvider>
+      <UserProvider>
+        <InitialLayout />
+      </UserProvider>
+    </DarkModeProvider>
   );
 }

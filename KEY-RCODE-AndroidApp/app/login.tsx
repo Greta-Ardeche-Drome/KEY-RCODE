@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -22,8 +22,14 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const { signIn } = useSession(); // Utilisation du contexte global
+  const { signIn, session, user } = useSession(); // Utilisation du contexte global
   const router = useRouter();
+
+  useEffect(() => {
+    if (session && user && user.email !== 'email@domaine.fr') {
+      router.replace('/(tabs)/home');
+    }
+  }, [session, user]);
 
   const handleLogin = async () => {
     if (!username || !password) {

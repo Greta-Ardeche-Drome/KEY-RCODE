@@ -1,42 +1,43 @@
 import { Tabs } from "expo-router";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDarkMode } from "./profile"; // Import du hook dark mode
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { darkMode } = useDarkMode();
+
+  const tabBarStyle = {
+    backgroundColor: darkMode ? '#23232b' : '#FFFFFF',
+    height: 65 + insets.bottom,
+    paddingBottom: 8 + insets.bottom,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: darkMode ? '#27272A' : '#E5E7EB',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    display: "flex",
+  };
 
   return (
     <Tabs
       screenOptions={{
         tabBarPosition: "bottom",
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          height: 65 + insets.bottom,
-          paddingBottom: 8 + insets.bottom,
-          paddingTop: 8,
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          // Ajoute cette ligne pour masquer la barre lors du scroll
-          display: "flex",
-        },
+        tabBarStyle,
         headerShown: false,
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: "600",
           marginTop: 4,
         },
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#9CA3AF',
-        // Ajoute cette option pour masquer la barre lors du scroll
+        tabBarActiveTintColor: darkMode ? '#60A5FA' : '#3B82F6',
+        tabBarInactiveTintColor: darkMode ? '#A1A1AA' : '#9CA3AF',
         tabBarHideOnKeyboard: true,
       }}
     >
-      {/* Tes onglets existants */}
       <Tabs.Screen
         name="home"
         options={{
@@ -55,7 +56,7 @@ export default function TabLayout() {
             <View style={{
               justifyContent: 'center',
               alignItems: 'center',
-              backgroundColor: focused ? '#3B82F6' : 'transparent',
+              backgroundColor: focused ? (darkMode ? '#60A5FA' : '#3B82F6') : 'transparent',
               borderRadius: 12,
               width: 50,
               height: 50,
