@@ -89,7 +89,9 @@ export default function Details() {
   const disconnect = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.1.13:3000/api/v1/open-door', {
+      // 2. On envoie l'ordre d'ouverture au serveur
+      // IP DU SERVEUR A REMPLACER CI-DESSOUS !
+      const response = await fetch('http://192.168.1.250:3000/api/v1/open-door', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
