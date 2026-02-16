@@ -62,7 +62,7 @@ export default function Login() {
           username: username,
           email: `${username}@KRC`,
           domain: 'KRC'
-        });
+        }, apiChoice);
       } else {
         throw new Error("Token manquant dans la réponse");
       }

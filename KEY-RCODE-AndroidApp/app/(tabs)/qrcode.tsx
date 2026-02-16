@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../config';
 import { Text, View, StyleSheet, TouchableOpacity, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useSession } from ".././UserContext";
@@ -47,7 +46,7 @@ export default function Details() {
 
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { session, user } = useSession();
+  const { session, user, currentApiUrl } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const { darkMode } = useDarkMode();
@@ -67,7 +66,7 @@ export default function Details() {
       const payload = {
         userId: user?.email ?? '' 
       };
-      const response = await fetch(`${API_BASE_URL}/generate`, {
+      const response = await fetch(`${currentApiUrl}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -93,7 +92,7 @@ export default function Details() {
     try {
       // 2. On envoie l'ordre d'ouverture au serveur
       // IP DU SERVEUR A REMPLACER CI-DESSOUS !
-      const response = await fetch(`${API_BASE_URL}/open-door`, {
+      const response = await fetch(`${currentApiUrl}/open-door`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

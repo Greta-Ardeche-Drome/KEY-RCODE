@@ -4,13 +4,12 @@ import { useRouter, usePathname } from "expo-router";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Logo from '../../assets/images/keyrcode-logo.png';
 import { useSession } from "../UserContext";
-import { API_BASE_URL } from '../config';
 import { useDarkMode } from '../DarkModeContext';
 
 export default function Home() {
   // 1. TOUS LES HOOKS EN PREMIER (Ordre immuable)
   const router = useRouter();
-  const { session, user } = useSession();
+  const { session, user, currentApiUrl } = useSession();
   const pathname = usePathname();
   const { darkMode } = useDarkMode(); 
   const [emergencyStep, setEmergencyStep] = React.useState(0);
@@ -36,7 +35,7 @@ export default function Home() {
   const sendEmergencyRequest = async () => {
     setEmergencyLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/emergency`, {
+      const response = await fetch(`${currentApiUrl}/emergency`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.email ?? '' }),
