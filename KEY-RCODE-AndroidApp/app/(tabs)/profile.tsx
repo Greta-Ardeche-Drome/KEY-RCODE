@@ -1,38 +1,20 @@
-import React, { useState, useContext, createContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from "../UserContext";
-
-// Contexte pour le mode sombre
-const DarkModeContext = createContext<{
-  darkMode: boolean;
-  setDarkMode: (v: boolean) => void;
-}>({ darkMode: false, setDarkMode: () => {} });
-
-export function useDarkMode() {
-  return useContext(DarkModeContext);
-}
-
-export function DarkModeProvider({ children }: { children: React.ReactNode }) {
-  const [darkMode, setDarkMode] = useState(false);
-  return (
-    <DarkModeContext.Provider value={{ darkMode, setDarkMode }}>
-      {children}
-    </DarkModeContext.Provider>
-  );
-}
+import { useDarkMode } from '../DarkModeContext';
 
 export default function Profile() {
+  // 1. TOUS LES HOOKS EN PREMIER (Ordre immuable)
   const [notifications, setNotifications] = useState(true);
   const [saveHistory, setSaveHistory] = useState(true);
-
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { signOut, user, session } = useSession();
-
-  if (!session || !user || user.email === 'email@domaine.fr') {
-    return null;
-  }
-
   const { darkMode, setDarkMode } = useDarkMode();
+
+  // 2. LOGIQUE DE CALCUL (Après les hooks)
+  const theme = darkMode ? darkStyles : lightStyles;
+  const isDisconnected = !session || !user || user.email === 'email@domaine.fr';
 
   const handleLogout = () => {
     Alert.alert(
@@ -44,70 +26,90 @@ export default function Profile() {
           text: 'Déconnexion', 
           style: 'destructive', 
           onPress: () => {
-            signOut(); // Déclenche le nettoyage et la redirection vers Login
+            setIsLoggingOut(true);
+            // On laisse un petit délai pour le feedback visuel
+            setTimeout(() => {
+              signOut();
+            }, 200);
           }
         },
       ]
     );
   };
 
-  const theme = darkMode ? darkStyles : lightStyles;
-
+  // 3. UN SEUL RETURN UNIQUE (Pas de if/return au milieu)
   return (
     <SafeAreaView style={[theme.safeArea]} edges={['top']}>
-      <ScrollView contentContainerStyle={theme.container}>
-        <View style={theme.header}>
-          <Text style={theme.title}>Mon Profil</Text>
+      {isDisconnected ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={darkMode ? '#fff' : '#3B82F6'} />
+          <Text style={{ color: darkMode ? '#fff' : '#000', fontSize: 18, marginTop: 10 }}>
+            Déconnexion en cours...
+          </Text>
         </View>
-
-        {/* Section Infos Utilisateur */}
-        <View style={theme.userInfoSection}>
-          <View style={theme.avatarContainer}>
-            <Text style={theme.avatarText}>
-              {user?.username ? user.username.substring(0, 2).toUpperCase() : '??'}
-            </Text>
+      ) : (
+        <ScrollView contentContainerStyle={theme.container}>
+          <View style={theme.header}>
+            <Text style={theme.title}>Mon Profil</Text>
           </View>
-          <Text style={theme.username}>{user?.username || 'Utilisateur'}</Text>
-          <Text style={theme.email}>{user?.email || 'email@domaine.fr'}</Text>
-          {session && (
-            <View style={theme.badgeContainer}>
-              <Text style={theme.badgeText}>Connecté • Sécurisé</Text>
+
+          {/* Section Infos Utilisateur */}
+          <View style={theme.userInfoSection}>
+            <View style={theme.avatarContainer}>
+              <Text style={theme.avatarText}>
+                {user?.username ? user.username.substring(0, 2).toUpperCase() : '??'}
+              </Text>
             </View>
-          )}
-        </View>
-
-        {/* Section Préférences */}
-        <View style={theme.section}>
-          <Text style={theme.sectionTitle}>Préférences</Text>
-          
-          <View style={theme.row}>
-            <View style={theme.rowIconBg}><Text>🔔</Text></View>
-            <Text style={theme.rowLabel}>Notifications</Text>
-            <Switch value={notifications} onValueChange={setNotifications} trackColor={{false: '#D1D5DB', true: '#3B82F6'}} />
+            <Text style={theme.username}>{user?.username || 'Utilisateur'}</Text>
+            <Text style={theme.email}>{user?.email || 'email@domaine.fr'}</Text>
+            {session && (
+              <View style={theme.badgeContainer}>
+                <Text style={theme.badgeText}>Connecté • Sécurisé</Text>
+              </View>
+            )}
           </View>
 
-          <View style={theme.row}>
-            <View style={theme.rowIconBg}><Text>🌙</Text></View>
-            <Text style={theme.rowLabel}>Mode Sombre</Text>
-            <Switch value={darkMode} onValueChange={setDarkMode} trackColor={{false: '#D1D5DB', true: '#3B82F6'}} />
+          {/* Section Préférences */}
+          <View style={theme.section}>
+            <Text style={theme.sectionTitle}>Préférences</Text>
+            
+            <View style={theme.row}>
+              <View style={theme.rowIconBg}><Text>🔔</Text></View>
+              <Text style={theme.rowLabel}>Notifications</Text>
+              <Switch value={notifications} onValueChange={setNotifications} trackColor={{false: '#D1D5DB', true: '#3B82F6'}} />
+            </View>
+
+            <View style={theme.row}>
+              <View style={theme.rowIconBg}><Text>🌙</Text></View>
+              <Text style={theme.rowLabel}>Mode Sombre</Text>
+              <Switch value={darkMode} onValueChange={setDarkMode} trackColor={{false: '#D1D5DB', true: '#3B82F6'}} />
+            </View>
+
+            <View style={theme.row}>
+              <View style={theme.rowIconBg}><Text>💾</Text></View>
+              <Text style={theme.rowLabel}>Historique local</Text>
+              <Switch value={saveHistory} onValueChange={setSaveHistory} trackColor={{false: '#D1D5DB', true: '#3B82F6'}} />
+            </View>
           </View>
 
-          <View style={theme.row}>
-            <View style={theme.rowIconBg}><Text>💾</Text></View>
-            <Text style={theme.rowLabel}>Historique local</Text>
-            <Switch value={saveHistory} onValueChange={setSaveHistory} trackColor={{false: '#D1D5DB', true: '#3B82F6'}} />
+          {/* Bouton Déconnexion */}
+          <TouchableOpacity
+            style={[theme.logoutButton, isLoggingOut && { opacity: 0.7 }]}
+            onPress={handleLogout}
+            disabled={isLoggingOut}
+          >
+            {isLoggingOut ? (
+              <ActivityIndicator color={darkMode ? '#FECACA' : '#DC2626'} />
+            ) : (
+              <Text style={theme.logoutText}>Se déconnecter</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={theme.footer}>
+            <Text style={theme.footerText}>Version 1.0.0</Text>
           </View>
-        </View>
-
-        {/* Bouton Déconnexion */}
-        <TouchableOpacity style={theme.logoutButton} onPress={handleLogout}>
-          <Text style={theme.logoutText}>Se déconnecter</Text>
-        </TouchableOpacity>
-
-        <View style={theme.footer}>
-          <Text style={theme.footerText}>Version 1.0.0</Text>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

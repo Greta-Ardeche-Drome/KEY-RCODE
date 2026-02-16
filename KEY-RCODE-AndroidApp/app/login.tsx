@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from "./UserContext";
+import { API_URLS } from './config';
 import { useRouter } from "expo-router";
 
 export default function Login() {
@@ -21,6 +22,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [apiChoice, setApiChoice] = useState<'OnPremises' | 'Cloud'>('OnPremises');
 
   const { signIn, session, user } = useSession(); // Utilisation du contexte global
   const router = useRouter();
@@ -41,7 +43,7 @@ export default function Login() {
 
     try {
       // --- APPEL RÉEL AU BACKEND LDAP ---
-      const response = await fetch('http://192.168.1.13:3000/api/v1/auth/login', {
+      const response = await fetch(`${API_URLS[apiChoice]}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -77,7 +79,7 @@ export default function Login() {
   const theme = isDarkMode ? darkTheme : lightTheme;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -94,6 +96,38 @@ export default function Login() {
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.text }]}>Connexion</Text>
             <Text style={[styles.subtitle, { color: theme.subtext }]}>Identifiez-vous pour accéder au service</Text>
+          </View>
+
+          {/* Choix API OnPremises/Cloud */}
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 16 }}>
+            <TouchableOpacity
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 20,
+                borderRadius: 20,
+                marginHorizontal: 8,
+                backgroundColor: apiChoice === 'OnPremises' ? '#2563eb' : theme.inputBg,
+                borderWidth: 1,
+                borderColor: apiChoice === 'OnPremises' ? '#2563eb' : theme.inputBorder,
+              }}
+              onPress={() => setApiChoice('OnPremises')}
+            >
+              <Text style={{ color: apiChoice === 'OnPremises' ? '#fff' : theme.text, fontWeight: 'bold' }}>🏢 OnPremises</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 20,
+                borderRadius: 20,
+                marginHorizontal: 8,
+                backgroundColor: apiChoice === 'Cloud' ? '#2563eb' : theme.inputBg,
+                borderWidth: 1,
+                borderColor: apiChoice === 'Cloud' ? '#2563eb' : theme.inputBorder,
+              }}
+              onPress={() => setApiChoice('Cloud')}
+            >
+              <Text style={{ color: apiChoice === 'Cloud' ? '#fff' : theme.text, fontWeight: 'bold' }}>☁️ Cloud</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.form}>

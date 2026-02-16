@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useDarkMode } from "./profile"; // Import du hook dark mode
+import { useDarkMode } from "../DarkModeContext"; // Import du hook dark mode
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -19,7 +19,7 @@ export default function TabLayout() {
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    display: "flex",
+    // display: "flex", // "flex" is default for View, so this can be omitted
   };
 
   return (

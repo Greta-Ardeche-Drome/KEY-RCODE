@@ -1,12 +1,7 @@
-import React, { useContext, createContext, type PropsWithChildren, useEffect } from 'react';
+import React, { useContext, createContext, type PropsWithChildren, useState, useCallback } from 'react';
 import { useStorageState } from './useStorageState';
-import { useRouter } from 'expo-router';
 
-type UserData = {
-  username: string;
-  email: string;
-  domain: string;
-};
+type UserData = { username: string; email: string; domain: string; };
 
 const AuthContext = createContext<{
   signIn: (token: string, userData: UserData) => void;
@@ -23,36 +18,17 @@ const AuthContext = createContext<{
 });
 
 export function useSession() {
-  const value = useContext(AuthContext);
-  if (process.env.NODE_ENV !== 'production') {
-    if (!value) {
-      throw new Error('useSession must be wrapped in a <UserProvider />');
-    }
-  }
-  return value;
+  return useContext(AuthContext);
 }
 
 export function UserProvider({ children }: PropsWithChildren) {
   const [[isLoading, session], setSession] = useStorageState('session_token');
-  const [user, setUser] = React.useState<UserData | null>(null);
-  const router = useRouter();
+  const [user, setUser] = useState<UserData | null>(null);
 
-  // signOut effectue le logout et la redirection une seule fois
-  const signOut = React.useCallback(() => {
+  const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
-    router.replace('/login');
-  }, [router, setSession]);
-
-  // Vérifie l'état d'authentification uniquement pour les cas automatiques (ex: session expirée)
-  useEffect(() => {
-    if (!isLoading && (!session || !user || user.email === 'email@domaine.fr')) {
-      // Ne pas appeler signOut si déjà sur login
-      if (router.pathname !== '/login') {
-        signOut();
-      }
-    }
-  }, [isLoading, session, user, signOut, router.pathname]);
+  }, [setSession]);
 
   return (
     <AuthContext.Provider

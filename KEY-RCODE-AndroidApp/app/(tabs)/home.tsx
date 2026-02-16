@@ -4,20 +4,21 @@ import { useRouter, usePathname } from "expo-router";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Logo from '../../assets/images/keyrcode-logo.png';
 import { useSession } from "../UserContext";
-import { useDarkMode } from './profile';
+import { API_BASE_URL } from '../config';
+import { useDarkMode } from '../DarkModeContext';
 
 export default function Home() {
+  // 1. TOUS LES HOOKS EN PREMIER (Ordre immuable)
   const router = useRouter();
   const { session, user } = useSession();
   const pathname = usePathname();
   const { darkMode } = useDarkMode(); 
+  const [emergencyStep, setEmergencyStep] = React.useState(0);
+  const [emergencyLoading, setEmergencyLoading] = React.useState(false);
 
+  // 2. VARIABLES ET LOGIQUE
   // C'est ici qu'on applique la magie : on choisit la bonne feuille de style !
   const styles = darkMode ? darkStyles : lightStyles;
-
-  if (!session || !user || user.email === 'email@domaine.fr') {
-    return null;
-  }
 
   useEffect(() => {
     if ((!session || !user || user.email === 'email@domaine.fr') && pathname !== '/login') {
@@ -25,13 +26,17 @@ export default function Home() {
     }
   }, [session, user, pathname]);
 
-  const [emergencyStep, setEmergencyStep] = React.useState(0);
-  const [emergencyLoading, setEmergencyLoading] = React.useState(false);
+  // 3. EARLY RETURN (Après les hooks)
+  if (!session || !user || user.email === 'email@domaine.fr') {
+    // On attend la redirection, on peut afficher un écran vide ou un loader
+    return <View style={{ flex: 1, backgroundColor: styles.container.backgroundColor }} />;
+  }
 
+  // 4. FONCTIONS
   const sendEmergencyRequest = async () => {
     setEmergencyLoading(true);
     try {
-      const response = await fetch('http://192.168.1.13:3000/api/v1/emergency', {
+      const response = await fetch(`${API_BASE_URL}/emergency`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user?.email ?? '' }),
@@ -69,6 +74,7 @@ export default function Home() {
     }
   };
 
+  // 5. RENDU PRINCIPAL
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <View style={styles.container}>

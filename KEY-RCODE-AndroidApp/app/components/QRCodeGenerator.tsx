@@ -32,29 +32,4 @@ export function useSession() {
   return value;
 }
 
-export function UserProvider({ children }: PropsWithChildren) {
-  const [[isLoading, session], setSession] = useStorageState('session_token');
-  const [user, setUser] = React.useState<UserData | null>(null);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        signIn: (token, userData) => {
-          // On sauvegarde le token de manière persistante (SecureStore)
-          setSession(token);
-          // On garde les infos utilisateur en mémoire
-          setUser(userData);
-        },
-        signOut: () => {
-          setSession(null);
-          setUser(null);
-        },
-        session,
-        isLoading,
-        user
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}

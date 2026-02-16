@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { Text, View, StyleSheet, TouchableOpacity, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { UserProvider, useSession } from ".././UserContext";
+import { useSession } from ".././UserContext";
 import { useRouter, usePathname } from "expo-router";
-import { useDarkMode } from './profile'; // <-- Import du hook mode sombre
+import { useDarkMode } from '../DarkModeContext'; // Corrected import
 
 type QRCodeGeneratorProps = {
   token: string;
@@ -43,13 +44,12 @@ const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
 
 // --- COMPOSANT PRINCIPAL: Page Details ---
 export default function Details() {
+
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { session, user } = useSession();
   const router = useRouter();
   const pathname = usePathname();
-
-  // On récupère le mode sombre et on choisit la bonne feuille de style
   const { darkMode } = useDarkMode();
   const styles = darkMode ? darkStyles : lightStyles;
 
@@ -59,13 +59,15 @@ export default function Details() {
     }
   }, [session, user, pathname]);
 
+  const isDisconnected = !session || !user || user.email === 'email@domaine.fr';
+
   const generateToken = async () => {
     setIsLoading(true);
     try {
       const payload = {
         userId: user?.email ?? '' 
       };
-      const response = await fetch('http://192.168.1.13:3000/api/v1/generate', {
+      const response = await fetch(`${API_BASE_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -91,7 +93,7 @@ export default function Details() {
     try {
       // 2. On envoie l'ordre d'ouverture au serveur
       // IP DU SERVEUR A REMPLACER CI-DESSOUS !
-      const response = await fetch('http://192.168.1.250:3000/api/v1/open-door', {
+      const response = await fetch(`${API_BASE_URL}/open-door`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -118,44 +120,50 @@ export default function Details() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* En-tête */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Générateur de QR Code</Text>
-          <Text style={styles.subtitle}>
-            Cliquez et Générez votre QR Code
-          </Text>
+      {isDisconnected ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: styles.safeArea?.backgroundColor || '#fff' }}>
+          <Text style={{ color: darkMode ? '#fff' : '#000', fontSize: 18 }}>Déconnexion en cours...</Text>
         </View>
+      ) : (
+        <View style={styles.container}>
+          {/* En-tête */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Générateur de QR Code</Text>
+            <Text style={styles.subtitle}>
+              Cliquez et Générez votre QR Code
+            </Text>
+          </View>
 
-        {/* Zone QR Code */}
-        <QRCodeGenerator token={token} />
+          {/* Zone QR Code */}
+          <QRCodeGenerator token={token} />
 
-        {/* Boutons d'action */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.primaryButton]}
-            onPress={generateToken}
-            activeOpacity={0.8}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-               <ActivityIndicator color="#fff" />
-            ) : (
-               <Text style={styles.buttonText}>✨ Générer un QR Code</Text>
-            )}
-          </TouchableOpacity>
-
-          {token && (
+          {/* Boutons d'action */}
+          <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={disconnect}
+              style={[styles.button, styles.primaryButton]}
+              onPress={generateToken}
               activeOpacity={0.8}
+              disabled={isLoading}
             >
-              <Text style={styles.secondaryButtonText}>🔄 Sortie</Text>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>✨ Générer un QR Code</Text>
+              )}
             </TouchableOpacity>
-          )}
+
+            {token && (
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton]}
+                onPress={disconnect}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.secondaryButtonText}>🔄 Sortie</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      )}
     </SafeAreaView>
   );
 }

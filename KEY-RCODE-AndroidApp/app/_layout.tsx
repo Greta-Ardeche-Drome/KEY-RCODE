@@ -2,7 +2,7 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { UserProvider, useSession } from './UserContext';
 import { View, ActivityIndicator } from 'react-native';
-import { DarkModeProvider } from './(tabs)/profile'; // Import du provider
+import { DarkModeProvider } from './DarkModeContext';
 
 function InitialLayout() {
   const { session, isLoading, user } = useSession();
@@ -13,14 +13,15 @@ function InitialLayout() {
     if (isLoading) return;
 
     const inTabsGroup = segments[0] === '(tabs)';
-    const notLogged = !session || !user || user.email === 'email@domaine.fr';
+    // Si pas de session OU pas d'user OU email par défaut => Déconnecté
+    const isLoggedOut = !session || !user || user.email === 'email@domaine.fr';
 
-    if (notLogged && inTabsGroup) {
+    if (isLoggedOut && inTabsGroup) {
       router.replace('/login');
-    } else if (!notLogged && segments[0] === 'login') {
+    } else if (!isLoggedOut && segments[0] === 'login') {
       router.replace('/(tabs)/home');
     }
-  }, [session, user, segments, isLoading]);
+  }, [session, user, isLoading, segments]);
 
   if (isLoading) {
     return (
