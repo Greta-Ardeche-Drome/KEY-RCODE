@@ -38,7 +38,7 @@ export default function Home() {
       const response = await fetch(`${currentApiUrl}/emergency`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user?.email ?? '' }),
+        body: JSON.stringify({ adminId: user?.email ?? 'Utilisateur Inconnu' }),
       });
       const data = await response.json();
       if (response.ok && data.success) {
