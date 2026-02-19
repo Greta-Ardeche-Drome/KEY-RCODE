@@ -3,7 +3,7 @@
 
 export const API_URLS = {
   OnPremises: "http://192.168.1.13:3000/api/v1",
-  Cloud: "https://ton-api-cloud.com/api/v1", // Vraie URL à remplacer
+  Cloud: "https://api.keyrcode.app/api/v1", 
 };
 
 // Hook pour obtenir l'API choisie (à utiliser dans les composants)
