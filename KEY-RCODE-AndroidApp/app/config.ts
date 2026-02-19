@@ -2,7 +2,7 @@
 // Centralized API configuration
 
 export const API_URLS = {
-  OnPremises: "http://192.168.1.13:3000/api/v1",
+  OnPremises: "https://localendpoint.keyrcode.app:3000/api/v1",
   Cloud: "https://api.keyrcode.app/api/v1", 
 };
 
