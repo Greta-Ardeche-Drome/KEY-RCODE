@@ -9,8 +9,12 @@ export default function Profile() {
   const [notifications, setNotifications] = useState(true);
   const [saveHistory, setSaveHistory] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { signOut, user, session } = useSession();
+  const { signOut, user, session, isLocked, currentApiUrl } = useSession();
   const { darkMode, setDarkMode } = useDarkMode();
+  
+  // Variables dérivées
+  const isAdmin = user?.role === 'admin';
+  const emergencyLock = { isLocked };
 
   // 2. LOGIQUE DE CALCUL (Après les hooks)
   const theme = darkMode ? darkStyles : lightStyles;
@@ -147,7 +151,47 @@ const lightStyles = StyleSheet.create({
   },
   logoutText: { color: '#DC2626', fontSize: 16, fontWeight: 'bold' },
   footer: { alignItems: 'center' },
-  footerText: { color: '#9CA3AF', fontSize: 12 }
+  footerText: { color: '#9CA3AF', fontSize: 12 },
+  
+  // Debug styles
+  debugHeader: {
+    padding: 5,
+    marginBottom: 10,
+  },
+  debugContent: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  debugText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  debugDetail: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontFamily: 'monospace',
+    backgroundColor: '#F3F4F6',
+    padding: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  debugButton: {
+    backgroundColor: '#3B82F6',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  debugButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 });
 
 const darkStyles = StyleSheet.create({
@@ -182,5 +226,45 @@ const darkStyles = StyleSheet.create({
   },
   logoutText: { color: '#FECACA', fontSize: 16, fontWeight: 'bold' },
   footer: { alignItems: 'center' },
-  footerText: { color: '#A1A1AA', fontSize: 12 }
+  footerText: { color: '#A1A1AA', fontSize: 12 },
+  
+  // Debug styles
+  debugHeader: {
+    padding: 5,
+    marginBottom: 10,
+  },
+  debugContent: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  debugText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#F3F4F6',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  debugDetail: {
+    fontSize: 10,
+    color: '#A1A1AA',
+    fontFamily: 'monospace',
+    backgroundColor: '#27272A',
+    padding: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  debugButton: {
+    backgroundColor: '#60A5FA',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  debugButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 });

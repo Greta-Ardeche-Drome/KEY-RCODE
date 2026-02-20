@@ -2,10 +2,15 @@ import { Tabs } from "expo-router";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDarkMode } from "../DarkModeContext"; // Import du hook dark mode
+import { useSession } from "../UserContext"; // Import pour vérifier le rôle admin
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { darkMode } = useDarkMode();
+  const { user } = useSession();
+  
+  // Déterminer si l'utilisateur est admin
+  const isAdmin = user?.role === 'admin';
 
   const tabBarStyle = {
     backgroundColor: darkMode ? '#23232b' : '#FFFFFF',
@@ -79,6 +84,19 @@ export default function TabLayout() {
             </Text>
           ),
           title: "Profil"
+        }}
+      />
+      {/* Onglet Admin - Visible uniquement pour les administrateurs */}
+      <Tabs.Screen
+        name="admin"
+        options={{
+          href: isAdmin ? '/(tabs)/admin' : null, // Masquer complètement l'onglet pour les non-admins
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: focused ? 28 : 26 }}>
+              {focused ? '⚡' : '🔧'}
+            </Text>
+          ),
+          title: "Admin"
         }}
       />
     </Tabs>

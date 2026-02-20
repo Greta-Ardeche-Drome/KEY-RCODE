@@ -58,11 +58,34 @@ export default function Login() {
       const token = data.token;
 
       if (token) {
-        signIn(token, {
+        // Extraction des informations utilisateur depuis la réponse
+        console.log('Backend login response:', JSON.stringify(data, null, 2));
+        
+        // Gestion robuste de l'email
+        let userEmail = data.user?.email || `${username}@KRC`;
+        if (Array.isArray(userEmail)) {
+          userEmail = userEmail[0] || `${username}@KRC`;
+        }
+        
+        // Détection admin plus robuste
+        const ldapGroups = data.user?.ldapGroups || data.user?.groups || [];
+        const isAdminUser = username.toLowerCase() === 'administrateur' || 
+                           ldapGroups.some((group: string) => 
+                             group.toLowerCase().includes('admin') || 
+                             group.toLowerCase().includes('administrator')
+                           ) ||
+                           data.user?.role === 'admin';
+
+        const userData = {
           username: username,
-          email: `${username}@KRC`,
-          domain: 'KRC'
-        }, apiChoice);
+          email: userEmail,
+          domain: data.user?.domain || 'KRC',
+          role: isAdminUser ? 'admin' as const : 'user' as const,
+          ldapGroup: Array.isArray(ldapGroups) ? ldapGroups[0] : (ldapGroups || 'Users')
+        };
+
+        console.log('Processed user data:', userData);
+        signIn(token, userData, apiChoice);
       } else {
         throw new Error("Token manquant dans la réponse");
       }

@@ -4,6 +4,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useSession } from ".././UserContext";
 import { useRouter, usePathname } from "expo-router";
 import { useDarkMode } from '../DarkModeContext'; // Corrected import
+import EmergencyService from '../services/emergencyService';
 
 type QRCodeGeneratorProps = {
   token: string;
@@ -46,7 +47,7 @@ export default function Details() {
 
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { session, user, currentApiUrl } = useSession();
+  const { session, user, currentApiUrl, signOut } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const { darkMode } = useDarkMode();
@@ -68,9 +69,19 @@ export default function Details() {
       };
       const response = await fetch(`${currentApiUrl}/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session}`,
+        },
         body: JSON.stringify(payload),
       });
+
+      if (response.status === 403) {
+        const data = await response.json();
+        if (EmergencyService.handleLockError(data, signOut)) {
+          return;
+        }
+      }
 
       const data = await response.json();
 
@@ -94,12 +105,22 @@ export default function Details() {
       // IP DU SERVEUR A REMPLACER CI-DESSOUS !
       const response = await fetch(`${currentApiUrl}/open-door`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session}`,
+        },
         body: JSON.stringify({ 
           userId: user?.email ?? '',
           action: 'exit' 
         }),
       });
+
+      if (response.status === 403) {
+        const data = await response.json();
+        if (EmergencyService.handleLockError(data, signOut)) {
+          return;
+        }
+      }
 
       const data = await response.json();
 

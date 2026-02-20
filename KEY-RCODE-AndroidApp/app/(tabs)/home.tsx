@@ -9,7 +9,7 @@ import { useDarkMode } from '../DarkModeContext';
 export default function Home() {
   // 1. TOUS LES HOOKS EN PREMIER (Ordre immuable)
   const router = useRouter();
-  const { session, user, currentApiUrl } = useSession();
+  const { session, user, currentApiUrl, checkLockStatus } = useSession();
   const pathname = usePathname();
   const { darkMode } = useDarkMode(); 
   const [emergencyStep, setEmergencyStep] = React.useState(0);
@@ -22,8 +22,11 @@ export default function Home() {
   useEffect(() => {
     if ((!session || !user || user.email === 'email@domaine.fr') && pathname !== '/login') {
       router.replace('/login');
+    } else if (session && user && user.email !== 'email@domaine.fr') {
+      // Vérifier le statut de verrouillage lors du chargement
+      checkLockStatus();
     }
-  }, [session, user, pathname]);
+  }, [session, user, pathname, checkLockStatus]);
 
   // 3. EARLY RETURN (Après les hooks)
   if (!session || !user || user.email === 'email@domaine.fr') {
@@ -81,7 +84,15 @@ export default function Home() {
         <View style={styles.header}>
           <Image source={Logo} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>KEY-RCODE</Text>
-          <Text style={styles.subtitle}>Votre Application D'accés sécurisé par QR Code</Text>
+          <Text style={styles.subtitle}>Votre application d'accès sécurisé par QR Code</Text>
+          {user && (
+            <View style={styles.userInfo}>
+              <Text style={styles.userText}>
+                {user.username} {user.role === 'admin' && '• Admin'}
+              </Text>
+              <Text style={styles.groupText}>Groupe: {user.ldapGroup}</Text>
+            </View>
+          )}
         </View>
 
         {/* Main Action */}
@@ -131,15 +142,18 @@ const lightStyles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F5F5F5' },
   container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
-    backgroundColor: '#3f82f5', paddingVertical: 40, paddingHorizontal: 20, alignItems: 'center',
+    backgroundColor: '#3f82f5', paddingVertical: 20, paddingHorizontal: 10, alignItems: 'center',
     borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: '#007d77',
     shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8,
   },
   title: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 5, letterSpacing: 1 },
   subtitle: { fontSize: 15, color: '#E0E7FF' },
-  content: { flex: 1, padding: 20, justifyContent: 'center' },
+  userInfo: { marginTop: 10, alignItems: 'center' },
+  userText: { fontSize: 14, color: '#FFFFFF', fontWeight: '600' },
+  groupText: { fontSize: 12, color: '#E0E7FF', marginTop: 2 },
+  content: { flex: 1, padding: 30, justifyContent: 'center' },
   mainCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 25, padding: 30, alignItems: 'center', marginBottom: 25,
+    backgroundColor: '#FFFFFF', borderRadius: 25, padding: 30, alignItems: 'center', marginBottom: 25,marginTop: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
   },
   mainIcon: { fontSize: 80, marginBottom: 20 },
@@ -165,15 +179,18 @@ const darkStyles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#1F2937' },
   container: { flex: 1, backgroundColor: '#1F2937' },
   header: {
-    backgroundColor: '#1e3a8a', paddingVertical: 40, paddingHorizontal: 20, alignItems: 'center',
+    backgroundColor: '#1e3a8a', paddingVertical: 20, paddingHorizontal: 10, alignItems: 'center',
     borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8,
   },
   title: { fontSize: 32, fontWeight: 'bold', color: '#F3F4F6', marginBottom: 5, letterSpacing: 1 },
   subtitle: { fontSize: 15, color: '#93C5FD' },
+  userInfo: { marginTop: 10, alignItems: 'center' },
+  userText: { fontSize: 14, color: '#F3F4F6', fontWeight: '600' },
+  groupText: { fontSize: 12, color: '#93C5FD', marginTop: 2 },
   content: { flex: 1, padding: 20, justifyContent: 'center' },
   mainCard: {
-    backgroundColor: '#374151', borderRadius: 25, padding: 30, alignItems: 'center', marginBottom: 25,
+    backgroundColor: '#374151', borderRadius: 25, padding: 30, alignItems: 'center', marginBottom: 25, marginTop: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
   },
   mainIcon: { fontSize: 80, marginBottom: 20 },
