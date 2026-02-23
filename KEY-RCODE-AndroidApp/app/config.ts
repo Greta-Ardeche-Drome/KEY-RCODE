@@ -8,7 +8,7 @@ export const CLOUD_API_URL = "https://api.keyrcode.app/api/v1";
 // Chaque site correspond à un groupe AD "DL_KRC_Users_{site}" / "DL_KRC_Admins_{site}"
 // et pointe vers son propre backend local.
 //
-// Convention DNS : localendpoint.<site>.keyrcode.app  →  résolu par le DNS interne
+// Convention DNS : localendpoint.<site>.keyrcode.app  →  résolu par le DNS Externe vers l'IP locale du serveur backend on-premises.
 // Le backend écoute sur le port 3000 en HTTPS.
 
 export interface SiteConfig {
