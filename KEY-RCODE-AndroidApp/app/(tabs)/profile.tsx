@@ -9,7 +9,7 @@ export default function Profile() {
   const [notifications, setNotifications] = useState(true);
   const [saveHistory, setSaveHistory] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { signOut, user, session, isLocked, currentApiUrl } = useSession();
+  const { signOut, user, session, isLocked, currentApiUrl, currentSite, apiChoice } = useSession();
   const { darkMode, setDarkMode } = useDarkMode();
   
   // Variables dérivées
@@ -69,6 +69,20 @@ export default function Profile() {
             {session && (
               <View style={theme.badgeContainer}>
                 <Text style={theme.badgeText}>Connecté • Sécurisé</Text>
+              </View>
+            )}
+            {session && apiChoice === 'OnPremises' && currentSite && (
+              <View style={[theme.badgeContainer, { marginTop: 6, backgroundColor: darkMode ? '#1e3a5f' : '#DBEAFE' }]}>
+                <Text style={[theme.badgeText, { color: darkMode ? '#93C5FD' : '#1d4ed8' }]}>
+                  📍 Site: {currentSite}
+                </Text>
+              </View>
+            )}
+            {session && apiChoice === 'Cloud' && (
+              <View style={[theme.badgeContainer, { marginTop: 6, backgroundColor: darkMode ? '#1e3a5f' : '#DBEAFE' }]}>
+                <Text style={[theme.badgeText, { color: darkMode ? '#93C5FD' : '#1d4ed8' }]}>
+                  ☁️ Cloud
+                </Text>
               </View>
             )}
           </View>

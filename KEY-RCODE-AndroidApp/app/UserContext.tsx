@@ -1,6 +1,6 @@
 import React, { useContext, createContext, type PropsWithChildren, useState, useCallback } from 'react';
 import { useStorageState } from './useStorageState';
-import { API_URLS } from './config';
+import { API_URLS, CLOUD_API_URL, resolveOnPremisesUrl, KNOWN_SITES } from './config';
 import { Alert } from 'react-native';
 
 type UserData = { 
@@ -9,17 +9,21 @@ type UserData = {
   domain: string; 
   role: 'admin' | 'user';
   ldapGroup: string;
+  /** Site AD auquel appartient l'utilisateur (ex: "Paris") */
+  site?: string;
 };
 type ApiChoice = 'OnPremises' | 'Cloud';
 
 const AuthContext = createContext<{
-  signIn: (token: string, userData: UserData, apiChoice: ApiChoice) => void;
+  signIn: (token: string, userData: UserData, apiChoice: ApiChoice, site?: string) => void;
   signOut: () => void;
   session?: string | null;
   isLoading: boolean;
   user: UserData | null;
   apiChoice: ApiChoice;
   currentApiUrl: string;
+  /** Site on-premises sélectionné (null si Cloud) */
+  currentSite: string | null;
   isLocked: boolean;
   triggerEmergencyLock: () => Promise<boolean>;
   resetUserLock: (targetUsername: string) => Promise<boolean>;
@@ -32,6 +36,7 @@ const AuthContext = createContext<{
   user: null,
   apiChoice: 'OnPremises',
   currentApiUrl: API_URLS.OnPremises,
+  currentSite: null,
   isLocked: false,
   triggerEmergencyLock: async () => false,
   resetUserLock: async () => false,
@@ -45,19 +50,28 @@ export function useSession() {
 export function UserProvider({ children }: PropsWithChildren) {
   const [[isLoading, session], setSession] = useStorageState('session_token');
   const [[, apiChoice], setApiChoice] = useStorageState('api_choice');
+  const [[, storedSite], setStoredSite] = useStorageState('krc_site');
   const [user, setUser] = useState<UserData | null>(null);
   const [isLocked, setIsLocked] = useState(false);
 
   // Valeur par défaut si pas encore défini
   const currentApiChoice: ApiChoice = (apiChoice as ApiChoice) || 'OnPremises';
-  const currentApiUrl = API_URLS[currentApiChoice];
+  const currentSite: string | null = storedSite || null;
+
+  // Résolution d'URL : si OnPremises + site → URL spécifique au site
+  const currentApiUrl = currentApiChoice === 'Cloud'
+    ? CLOUD_API_URL
+    : currentSite
+      ? resolveOnPremisesUrl(currentSite)
+      : API_URLS.OnPremises;
 
   const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
     setApiChoice(null);
+    setStoredSite(null);
     setIsLocked(false);
-  }, [setSession, setApiChoice]);
+  }, [setSession, setApiChoice, setStoredSite]);
 
   // Fonction pour déclencher le verrouillage d'urgence
   const triggerEmergencyLock = useCallback(async (): Promise<boolean> => {
@@ -172,10 +186,11 @@ export function UserProvider({ children }: PropsWithChildren) {
   return (
     <AuthContext.Provider
       value={{
-        signIn: (token, userData, apiChoice) => {
+        signIn: (token, userData, apiChoice, site) => {
           setSession(token);
           setUser(userData);
           setApiChoice(apiChoice);
+          setStoredSite(site || null);
           setIsLocked(false);
         },
         signOut,
@@ -184,6 +199,7 @@ export function UserProvider({ children }: PropsWithChildren) {
         user,
         apiChoice: currentApiChoice,
         currentApiUrl,
+        currentSite,
         isLocked,
         triggerEmergencyLock,
         resetUserLock,

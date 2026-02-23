@@ -9,14 +9,14 @@ import { useDarkMode } from '../DarkModeContext';
 export default function Home() {
   // 1. TOUS LES HOOKS EN PREMIER (Ordre immuable)
   const router = useRouter();
-  const { session, user, currentApiUrl, checkLockStatus } = useSession();
+  const { session, user, currentApiUrl, checkLockStatus, currentSite, apiChoice } = useSession();
   const pathname = usePathname();
   const { darkMode } = useDarkMode(); 
   const [emergencyStep, setEmergencyStep] = React.useState(0);
   const [emergencyLoading, setEmergencyLoading] = React.useState(false);
 
   // 2. VARIABLES ET LOGIQUE
-  // C'est ici qu'on applique la magie : on choisit la bonne feuille de style !
+  // Choix des styles en fonction du mode sombre
   const styles = darkMode ? darkStyles : lightStyles;
 
   useEffect(() => {
@@ -91,6 +91,12 @@ export default function Home() {
                 {user.username} {user.role === 'admin' && '• Admin'}
               </Text>
               <Text style={styles.groupText}>Groupe: {user.ldapGroup}</Text>
+              {apiChoice === 'OnPremises' && currentSite && (
+                <Text style={styles.groupText}>📍 Site: {currentSite}</Text>
+              )}
+              {apiChoice === 'Cloud' && (
+                <Text style={styles.groupText}>☁️ Cloud</Text>
+              )}
             </View>
           )}
         </View>
@@ -160,7 +166,7 @@ const lightStyles = StyleSheet.create({
   mainTitle: { fontSize: 24, fontWeight: 'bold', color: '#1F2937', marginBottom: 10, textAlign: 'center' },
   mainDescription: { fontSize: 15, color: '#6B7280', textAlign: 'center', marginBottom: 25, lineHeight: 22 },
   primaryButton: {
-    backgroundColor: '#32cf75', paddingVertical: 18, paddingHorizontal: 50, borderRadius: 15,
+    backgroundColor: '#32cf75', paddingVertical: 5, paddingHorizontal: 50, borderRadius: 15,
     shadowColor: '#007d77', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
   },
   primaryButtonText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
@@ -179,7 +185,7 @@ const darkStyles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#1F2937' },
   container: { flex: 1, backgroundColor: '#1F2937' },
   header: {
-    backgroundColor: '#1e3a8a', paddingVertical: 20, paddingHorizontal: 10, alignItems: 'center',
+    backgroundColor: '#1e3a8a', paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center',
     borderBottomLeftRadius: 30, borderBottomRightRadius: 30, shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8,
   },
