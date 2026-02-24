@@ -56,7 +56,7 @@ export default function Login() {
         }
       }
     } catch (error) {
-      console.log('Erreur lecture identifiants sauvegardés:', error);
+      // Erreur silencieuse
     }
   };
 
@@ -72,7 +72,7 @@ export default function Login() {
         await SecureStore.deleteItemAsync('krc_remember_credentials');
       }
     } catch (error) {
-      console.log('Erreur sauvegarde identifiants:', error);
+      // Erreur silencieuse
     }
   };
   // ──────────────────────────────────────────────────
@@ -119,7 +119,6 @@ export default function Login() {
 
       if (token) {
         // Extraction des informations utilisateur depuis la réponse
-        console.log('Backend login response:', JSON.stringify(data, null, 2));
         
         // Gestion robuste de l'email
         let userEmail = data.user?.email || `${username}@KRC`;
@@ -128,7 +127,10 @@ export default function Login() {
         }
         
         // Détection admin plus robuste
-        const ldapGroups = data.user?.ldapGroups || data.user?.groups || [];
+        const rawLdapGroups = data.user?.ldapGroups || data.user?.groups || [];
+        // LDAP peut retourner une chaîne si un seul groupe, ou un tableau si plusieurs
+        const ldapGroups = Array.isArray(rawLdapGroups) ? rawLdapGroups : [rawLdapGroups];
+        
         const isAdminUser = username.toLowerCase() === 'administrateur' || 
                            ldapGroups.some((group: string) => 
                              group.toLowerCase().includes('admin') || 
@@ -148,11 +150,12 @@ export default function Login() {
           email: userEmail,
           domain: data.user?.domain || 'KRC',
           role: isAdminUser ? 'admin' as const : 'user' as const,
-          ldapGroup: Array.isArray(ldapGroups) ? ldapGroups[0] : (ldapGroups || 'Users'),
+          ldapGroup: Array.isArray(ldapGroups) && ldapGroups.length > 0 
+            ? ldapGroups[0] 
+            : (data.user?.group || data.user?.ldapGroup || `DL_KRC_Users_${siteFromLdap || selectedSite?.name || 'DefaultSite'}`),
           site: siteFromLdap || (apiChoice === 'OnPremises' ? selectedSite?.name : undefined),
         };
 
-        console.log('Processed user data:', userData);
         signIn(token, userData, apiChoice, apiChoice === 'OnPremises' ? selectedSite?.name : undefined);
         
         // ✅ Sauvegarder les identifiants si Remember Me
@@ -283,10 +286,7 @@ export default function Login() {
                   setIsProbing(true);
                   setProbeResult(null);
                   try {
-                    console.log('🔍 Début auto-détection des sites...');
-                    console.log('Sites à tester:', KNOWN_SITES);
                     const reachable = await autoDetectSites(4000);
-                    console.log('Sites détectés comme joignables:', reachable);
                     setDetectedSites(reachable);
                     if (reachable.length > 0) {
                       setSelectedSite(reachable[0]);

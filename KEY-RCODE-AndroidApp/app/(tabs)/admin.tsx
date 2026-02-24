@@ -19,7 +19,7 @@ import { useSession } from '../UserContext';
 import { useDarkMode } from '../DarkModeContext';
 import { useEmergencyService } from '../hooks/useEmergencyService';
 import { useRouter, usePathname } from 'expo-router';
-import EmergencyService, { UserLockInfo } from '../services/emergencyService';
+import EmergencyService, { UserLockInfo, GroupLockInfo } from '../services/emergencyService';
 
 export default function AdminPanel() {
   const { user, session, signOut, currentApiUrl } = useSession();
@@ -28,12 +28,14 @@ export default function AdminPanel() {
   const router = useRouter();
   const pathname = usePathname();
   
-  const [targetUsername, setTargetUsername] = useState('');
-  const [isUnlocking, setIsUnlocking] = useState(false);
   const [isEmergencyLoading, setIsEmergencyLoading] = useState(false);
   const [lockedUsers, setLockedUsers] = useState<UserLockInfo[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [userGroupLocked, setUserGroupLocked] = useState(false);
+  const [isCheckingGroup, setIsCheckingGroup] = useState(false);
+  const [isUnlockingGroup, setIsUnlockingGroup] = useState(false);
+  const [isUnlockingAll, setIsUnlockingAll] = useState(false);
   
   const styles = darkMode ? darkStyles : lightStyles;
   const emergencyService = new EmergencyService(currentApiUrl, session || '');
@@ -54,9 +56,21 @@ export default function AdminPanel() {
       return;
     }
 
-    // Charger la liste des utilisateurs verrouillés au démarrage
+    // Charger la liste des utilisateurs verrouillés et vérifier le groupe au démarrage
     loadLockedUsers();
+    checkUserGroupStatus();
   }, [user, session, pathname]);
+
+  // Extraire le groupe utilisateur depuis le groupe admin (DL_KRC_Admins_Site -> DL_KRC_Users_Site)
+  const getUserGroupFromAdminGroup = (adminGroup: string | undefined): string | null => {
+    if (!adminGroup) return null;
+    const match = adminGroup.match(/CN=DL_KRC_Admins_([^,]+)/i);
+    if (match) {
+      const site = match[1];
+      return `CN=DL_KRC_Users_${site},OU=KRC_Applicatif,DC=krc,DC=local`;
+    }
+    return null;
+  };
 
   // Fonction pour charger la liste des utilisateurs verrouillés
   const loadLockedUsers = async () => {
@@ -66,7 +80,6 @@ export default function AdminPanel() {
       if (response.success) {
         setLockedUsers(response.users);
       } else {
-        // Liste vide en attendant l'implémentation de l'endpoint backend
         setLockedUsers([]);
       }
     } catch (error) {
@@ -77,10 +90,82 @@ export default function AdminPanel() {
     }
   };
 
+  // Vérifier le statut du groupe utilisateur associé
+  const checkUserGroupStatus = async () => {
+    const userGroup = getUserGroupFromAdminGroup(user?.ldapGroup);
+    if (!userGroup) return;
+
+    setIsCheckingGroup(true);
+    try {
+      const response = await emergencyService.getLockedUsers();
+      
+      if (response.success && response.lockedGroups) {
+        const isLocked = response.lockedGroups.some(
+          (g: any) => g.ldap_group === userGroup
+        );
+        setUserGroupLocked(isLocked);
+      } else {
+        setUserGroupLocked(false);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification du groupe:', error);
+      setUserGroupLocked(false);
+    } finally {
+      setIsCheckingGroup(false);
+    }
+  };
+
+  // Déverrouiller le groupe utilisateur
+  const unlockUserGroup = async () => {
+    const userGroup = getUserGroupFromAdminGroup(user?.ldapGroup);
+    if (!userGroup) return;
+
+    const shortGroupName = userGroup.match(/Users_([^,]+)/)?.[1] || userGroup;
+
+    Alert.alert(
+      'Déverrouillage du groupe',
+      `Voulez-vous déverrouiller le groupe "${shortGroupName}" ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Déverrouiller',
+          style: 'destructive',
+          onPress: async () => {
+            setIsUnlockingGroup(true);
+            try {
+              const response = await fetch(`${currentApiUrl}/emergency/reset`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session}`,
+                },
+                body: JSON.stringify({ ldapGroup: userGroup }),
+              });
+
+              const data = await response.json();
+              if (response.ok) {
+                Alert.alert('Succès', `${shortGroupName} a été déverrouillé`);
+                setUserGroupLocked(false);
+              } else {
+                Alert.alert('Erreur', data.error || 'Impossible de déverrouiller le groupe');
+              }
+            } catch (error) {
+              console.error('Erreur unlock group:', error);
+              Alert.alert('Erreur', 'Erreur réseau');
+            } finally {
+              setIsUnlockingGroup(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // Fonction pour rafraîchir la liste
   const onRefresh = async () => {
     setRefreshing(true);
     await loadLockedUsers();
+    await checkUserGroupStatus();
     setRefreshing(false);
   };
 
@@ -132,24 +217,93 @@ export default function AdminPanel() {
     );
   }
 
-  const handleEmergencyOpen = async () => {
+  // Fonction pour débloquer TOUS les groupes (super-admin seulement)
+  const unlockAllGroups = async () => {
     Alert.alert(
-      'Urgence Administrateur',
-      'Voulez-vous déclencher l\'ouverture d\'urgence de toutes les portes ?',
+      '⚠️ Déverrouillage Global',
+      'Vous êtes sur le point de déverrouiller TOUS les groupes LDAP verrouillés dans le système.\n\nCette action affectera tous les sites.\n\nÊtes-vous sûr ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
-          text: 'Déclencher',
+          text: 'Confirmer',
+          style: 'destructive',
+          onPress: async () => {
+            setIsUnlockingAll(true);
+            try {
+              const response = await fetch(`${currentApiUrl}/emergency/reset`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session}`,
+                },
+                body: JSON.stringify({
+                  unlockAllGroups: true
+                }),
+              });
+
+              const data = await response.json();
+
+              if (response.ok) {
+                Alert.alert(
+                  '✅ Succès',
+                  `${data.groupsUnlocked || 0} groupe(s) déverrouillé(s) avec succès.`,
+                  [{ text: 'OK', onPress: () => checkUserGroupStatus() }]
+                );
+              } else {
+                Alert.alert('Erreur', data.message || data.error || 'Impossible de déverrouiller les groupes');
+              }
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de communiquer avec le serveur');
+            } finally {
+              setIsUnlockingAll(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleEmergencyOpen = async () => {
+    Alert.alert(
+      'Urgence Administrateur',
+      'En tant qu\'administrateur, vous allez :\n\n• Ouvrir toutes les portes\n• Verrouiller les utilisateurs de votre groupe\n• Vous rester accessible\n\nÊtes-vous sûr ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Confirmer',
           style: 'destructive',
           onPress: async () => {
             setIsEmergencyLoading(true);
             try {
-              const success = await triggerEmergencyOpen();
+              const success = await triggerEmergencyOpen(false);
+              
               if (success) {
-                Alert.alert('Succès', 'Ouverture d\'urgence déclenchée');
+                
+                try {
+                  const response = await fetch(`${currentApiUrl}/emergency/trigger`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session}`,
+                    },
+                  });
+                  
+                  const data = await response.json();
+                  
+                  if (response.ok && data.message) {
+                    Alert.alert('✅ Urgence activée', 'Portes ouvertes et utilisateurs verrouillés');
+                    // Rafraîchir le statut du groupe
+                    await checkUserGroupStatus();
+                  } else {
+                    Alert.alert('⚠️ Urgence partielle', 'Portes ouvertes mais erreur de verrouillage');
+                  }
+                } catch (lockError) {
+                  Alert.alert('⚠️ Urgence partielle', 'Portes ouvertes mais erreur de verrouillage');
+                }
+              } else {
+                Alert.alert('❌ Erreur', 'Impossible d\'ouvrir les portes');
               }
             } catch (error) {
-              console.error('Erreur urgence admin:', error);
               Alert.alert('Erreur', 'Impossible de déclencher l\'ouverture d\'urgence');
             } finally {
               setIsEmergencyLoading(false);
@@ -160,40 +314,7 @@ export default function AdminPanel() {
     );
   };
 
-  const handleUnlockUser = async () => {
-    if (!targetUsername.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir un nom d\'utilisateur.');
-      return;
-    }
 
-    Alert.alert(
-      'Confirmer le déverrouillage',
-      `Êtes-vous sûr de vouloir déverrouiller le compte "${targetUsername.trim()}" ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déverrouiller',
-          style: 'destructive',
-          onPress: async () => {
-            setIsUnlocking(true);
-            try {
-              const success = await resetUserLock(targetUsername.trim());
-              if (success) {
-                setTargetUsername('');
-                // Recharger la liste après déverrouillage
-                await loadLockedUsers();
-              }
-            } catch (error) {
-              console.error('Erreur unlock:', error);
-              Alert.alert('Erreur', 'Une erreur est survenue.');
-            } finally {
-              setIsUnlocking(false);
-            }
-          }
-        }
-      ]
-    );
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -242,53 +363,16 @@ export default function AdminPanel() {
           </TouchableOpacity>
         </View>
 
-        {/* Section Déverrouillage d'Utilisateurs */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔓 Déverrouillage d'Utilisateurs</Text>
-          <Text style={styles.sectionDescription}>
-            Déverrouillez les comptes qui ont été bloqués suite à un déclenchement d'urgence
-          </Text>
-          
-          <View style={styles.unlockForm}>
-            <Text style={styles.inputLabel}>Nom d'utilisateur à déverrouiller :</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="ex: jean.dupont"
-              placeholderTextColor={darkMode ? '#9CA3AF' : '#6B7280'}
-              value={targetUsername}
-              onChangeText={setTargetUsername}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!isUnlocking}
-            />
-            
-            <TouchableOpacity
-              style={[styles.unlockButton, (!targetUsername.trim() || isUnlocking) && styles.disabledButton]}
-              onPress={handleUnlockUser}
-              disabled={!targetUsername.trim() || isUnlocking}
-            >
-              {isUnlocking ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Text style={styles.unlockButtonIcon}>🔓</Text>
-                  <Text style={styles.unlockButtonText}>Déverrouiller</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Section Liste des Utilisateurs Verrouillés */}
+        {/* Section Statut du Groupe Utilisateurs */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>👥 Utilisateurs Verrouillés</Text>
+            <Text style={styles.sectionTitle}>👥 Groupe Utilisateurs de votre Site</Text>
             <TouchableOpacity
               style={styles.refreshButton}
-              onPress={loadLockedUsers}
-              disabled={isLoadingUsers}
+              onPress={checkUserGroupStatus}
+              disabled={isCheckingGroup}
             >
-              {isLoadingUsers ? (
+              {isCheckingGroup ? (
                 <ActivityIndicator size="small" color={darkMode ? '#60A5FA' : '#3B82F6'} />
               ) : (
                 <Text style={styles.refreshButtonText}>🔄</Text>
@@ -296,58 +380,140 @@ export default function AdminPanel() {
             </TouchableOpacity>
           </View>
           
-          {isLoadingUsers && lockedUsers.length === 0 ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={darkMode ? '#60A5FA' : '#3B82F6'} />
-              <Text style={styles.loadingText}>Chargement...</Text>
+          <Text style={styles.sectionDescription}>
+            Statut du groupe LDAP des utilisateurs de votre site
+          </Text>
+
+          {(() => {
+            const userGroup = getUserGroupFromAdminGroup(user?.ldapGroup);
+            const shortGroupName = userGroup?.match(/Users_([^,]+)/)?.[1] || 'N/A';
+            
+            if (!userGroup) {
+              return (
+                <View style={styles.groupStatusCard}>
+                  <Text style={styles.emptySubtitle}>Impossible de déterminer le groupe utilisateur</Text>
+                </View>
+              );
+            }
+
+            return (
+              <View style={[styles.groupStatusCard, userGroupLocked ? styles.groupLocked : styles.groupUnlocked]}>
+                <View style={styles.groupStatusHeader}>
+                  <Text style={styles.groupStatusIcon}>{userGroupLocked ? '🔒' : '✅'}</Text>
+                  <View style={styles.groupStatusInfo}>
+                    <Text style={styles.groupName}>{shortGroupName}</Text>
+                    <Text style={[styles.groupStatus, userGroupLocked ? styles.statusLocked : styles.statusUnlocked]}>
+                      {userGroupLocked ? 'VERROUILLÉ' : 'DÉVERROUILLÉ'}
+                    </Text>
+                  </View>
+                </View>
+                
+                {userGroupLocked && (
+                  <TouchableOpacity
+                    style={[styles.unlockGroupButton, isUnlockingGroup && styles.disabledButton]}
+                    onPress={unlockUserGroup}
+                    disabled={isUnlockingGroup}
+                  >
+                    {isUnlockingGroup ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Text style={styles.unlockGroupButtonIcon}>🔓</Text>
+                        <Text style={styles.unlockGroupButtonText}>Déverrouiller le groupe</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {!userGroupLocked && (
+                  <View style={styles.groupOkMessage}>
+                    <Text style={styles.groupOkText}>✓ Tous les utilisateurs de ce groupe peuvent se connecter</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })()}
+        </View>
+
+        {/* Section Super Admin - Déverrouillage Global */}
+        {(user.email?.toLowerCase().trim() === 'administrateur@krc' || 
+          user.username?.toLowerCase().trim() === 'administrateur') && (
+          <View style={[styles.section, styles.superAdminSection]}>
+            <View style={styles.superAdminHeader}>
+              <Text style={styles.superAdminBadge}>👑 SUPER ADMIN</Text>
+              <Text style={styles.sectionTitle}>Contrôle Global</Text>
             </View>
-          ) : lockedUsers.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyTitle}>Aucun utilisateur verrouillé</Text>
-              <Text style={styles.emptySubtitle}>
-                Tous les comptes sont actuellement déverrouillés
-              </Text>
+            <Text style={styles.sectionDescription}>
+              En tant qu'administrateur absolu, vous pouvez déverrouiller tous les groupes du système en une seule action.
+            </Text>
+            <TouchableOpacity
+              style={[styles.superAdminButton, isUnlockingAll && styles.disabledButton]}
+              onPress={unlockAllGroups}
+              disabled={isUnlockingAll}
+            >
+              {isUnlockingAll ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.superAdminButtonIcon}>🔓</Text>
+                  <Text style={styles.superAdminButtonText}>Déverrouiller Tous les Groupes</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            
+            {/* Liste des utilisateurs verrouillés individuellement */}
+            <View style={styles.superAdminDivider} />
+            
+            <View style={styles.lockedUsersHeader}>
+              <Text style={styles.lockedUsersTitle}>🔒 Utilisateurs Verrouillés</Text>
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={loadLockedUsers}
+                disabled={isLoadingUsers}
+              >
+                {isLoadingUsers ? (
+                  <ActivityIndicator size="small" color={darkMode ? '#FBBF24' : '#F59E0B'} />
+                ) : (
+                  <Text style={styles.refreshButtonText}>🔄</Text>
+                )}
+              </TouchableOpacity>
             </View>
-          ) : (
-            <FlatList
-              data={lockedUsers}
-              keyExtractor={(item, index) => `${item.username}-${index}`}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={darkMode ? '#60A5FA' : '#3B82F6'}
-                />
-              }
-              renderItem={({ item }) => (
-                <View style={styles.lockedUserItem}>
-                  <View style={styles.userInfo}>
-                    <View style={styles.userIcon}>
-                      <Text style={styles.userIconText}>🔒</Text>
-                    </View>
+
+            {isLoadingUsers && lockedUsers.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={darkMode ? '#60A5FA' : '#3B82F6'} />
+                <Text style={styles.loadingText}>Chargement...</Text>
+              </View>
+            ) : lockedUsers.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>✅</Text>
+                <Text style={styles.emptyTitle}>Aucun utilisateur verrouillé</Text>
+                <Text style={styles.emptySubtitle}>
+                  Tous les comptes sont actuellement accessibles
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.lockedUsersList}>
+                {lockedUsers.map((user, index) => (
+                  <View key={index} style={styles.lockedUserItem}>
                     <View style={styles.userDetails}>
-                      <Text style={styles.username}>{item.username}</Text>
+                      <Text style={styles.username}>👤 {user.username}</Text>
                       <Text style={styles.lockTime}>
-                        Verrouillé le {new Date(item.triggeredAt).toLocaleString('fr-FR')}
+                        Verrouillé le {new Date(user.triggeredAt).toLocaleString('fr-FR')}
                       </Text>
                     </View>
+                    <TouchableOpacity
+                      style={styles.quickUnlockButton}
+                      onPress={() => quickUnlock(user.username)}
+                    >
+                      <Text style={styles.quickUnlockButtonText}>Débloquer</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    style={styles.quickUnlockButton}
-                    onPress={() => quickUnlock(item.username)}
-                  >
-                    <Text style={styles.quickUnlockButtonText}>Déverrouiller</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-              style={styles.usersList}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false} // Désactiver le scroll de la FlatList car on est déjà dans une ScrollView
-            />
-          )}
-        </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Section Outils d'Administration */}
         <View style={styles.section}>
@@ -654,6 +820,79 @@ const lightStyles = StyleSheet.create({
     height: 8,
   },
   
+  // Groupe utilisateurs
+  groupStatusCard: {
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+  },
+  groupLocked: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#DC2626',
+  },
+  groupUnlocked: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#10B981',
+  },
+  groupStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  groupStatusIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  groupStatusInfo: {
+    flex: 1,
+  },
+  groupName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  groupStatus: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  statusLocked: {
+    color: '#DC2626',
+  },
+  statusUnlocked: {
+    color: '#10B981',
+  },
+  unlockGroupButton: {
+    backgroundColor: '#059669',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  unlockGroupButtonIcon: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  unlockGroupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  groupOkMessage: {
+    backgroundColor: '#D1FAE5',
+    padding: 10,
+    borderRadius: 8,
+  },
+  groupOkText: {
+    color: '#065F46',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  
   // States
   disabledButton: { opacity: 0.6 },
   
@@ -688,6 +927,67 @@ const lightStyles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  // Super Admin section
+  superAdminSection: {
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    backgroundColor: '#FFFBEB',
+  },
+  superAdminHeader: {
+    marginBottom: 12,
+  },
+  superAdminBadge: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#D97706',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  superAdminButton: {
+    backgroundColor: '#F59E0B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 10,
+    gap: 10,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  superAdminButtonIcon: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  superAdminButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  superAdminDivider: {
+    height: 1,
+    backgroundColor: '#F59E0B',
+    marginVertical: 20,
+    opacity: 0.3,
+  },
+  lockedUsersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  lockedUsersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  lockedUsersList: {
+    gap: 10,
   },
 });
 
@@ -901,5 +1201,139 @@ const darkStyles = StyleSheet.create({
   },
   separator: {
     height: 8,
+  },
+  
+  // Groupe utilisateurs
+  groupStatusCard: {
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+  },
+  groupLocked: {
+    backgroundColor: '#450A0A',
+    borderColor: '#DC2626',
+  },
+  groupUnlocked: {
+    backgroundColor: '#064E3B',
+    borderColor: '#10B981',
+  },
+  groupStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  groupStatusIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  groupStatusInfo: {
+    flex: 1,
+  },
+  groupName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F3F4F6',
+    marginBottom: 4,
+  },
+  groupStatus: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  statusLocked: {
+    color: '#FCA5A5',
+  },
+  statusUnlocked: {
+    color: '#6EE7B7',
+  },
+  unlockGroupButton: {
+    backgroundColor: '#059669',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  unlockGroupButtonIcon: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  unlockGroupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  groupOkMessage: {
+    backgroundColor: '#065F46',
+    padding: 10,
+    borderRadius: 8,
+  },
+  groupOkText: {
+    color: '#D1FAE5',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  
+  // Super Admin section
+  superAdminSection: {
+    borderWidth: 2,
+    borderColor: '#FBBF24',
+    backgroundColor: '#7C2D12',
+  },
+  superAdminHeader: {
+    marginBottom: 12,
+  },
+  superAdminBadge: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FDE047',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  superAdminButton: {
+    backgroundColor: '#D97706',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 10,
+    gap: 10,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  superAdminButtonIcon: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  superAdminButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  superAdminDivider: {
+    height: 1,
+    backgroundColor: '#FBBF24',
+    marginVertical: 20,
+    opacity: 0.3,
+  },
+  lockedUsersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  lockedUsersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F3F4F6',
+  },
+  lockedUsersList: {
+    gap: 10,
   },
 });

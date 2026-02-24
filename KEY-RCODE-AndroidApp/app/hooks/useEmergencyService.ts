@@ -14,8 +14,9 @@ export function useEmergencyService() {
 
   /**
    * Déclenche une ouverture d'urgence classique (toutes les portes)
+   * @param showAlert - Si true, affiche une alerte de confirmation (défaut: true)
    */
-  const triggerEmergencyOpen = useCallback(async (): Promise<boolean> => {
+  const triggerEmergencyOpen = useCallback(async (showAlert = true): Promise<boolean> => {
     if (!user) {
       Alert.alert('Erreur', 'Vous devez être connecté.');
       return false;
@@ -24,10 +25,14 @@ export function useEmergencyService() {
     const result = await emergencyService.triggerEmergencyOpen(user.email);
     
     if (result.success) {
-      Alert.alert('Urgence', result.message);
+      if (showAlert) {
+        Alert.alert('Urgence', result.message);
+      }
       return true;
     } else {
-      Alert.alert('Erreur', result.message);
+      if (showAlert) {
+        Alert.alert('Erreur', result.message);
+      }
       return false;
     }
   }, [user, emergencyService]);
@@ -42,20 +47,44 @@ export function useEmergencyService() {
       return false;
     }
 
-    // Si l'utilisateur est admin, on déclenche juste l'ouverture d'urgence
+    // Si l'utilisateur est admin, on déclenche l'ouverture d'urgence ET le verrouillage des users (mais pas l'admin)
     if (user.role === 'admin') {
       Alert.alert(
         'Mode Administrateur',
-        'En tant qu\'administrateur, vous déclenchez l\'ouverture d\'urgence sans verrouillage.',
+        'En tant qu\'administrateur, vous allez :\n\n• Ouvrir toutes les portes\n• Verrouiller les utilisateurs de votre groupe\n• Vous rester accessible',
         [
-          // { text: 'Annuler', style: 'cancel' },
+          { 
+            text: 'Annuler', 
+            style: 'cancel'
+          },
           { 
             text: 'Confirmer', 
             style: 'destructive',
             onPress: async () => {
-              const success = await triggerEmergencyOpen();
+              const success = await triggerEmergencyOpen(false);
+              
               if (success) {
-                console.log('Urgence déclenchée par l\'admin:', user.username);
+                try {
+                  const response = await fetch(`${currentApiUrl}/emergency/trigger`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session}`,
+                    },
+                  });
+                  
+                  const data = await response.json();
+                  
+                  if (response.ok && data.message) {
+                    Alert.alert('✅ Urgence activée', 'Portes ouvertes et utilisateurs verrouillés');
+                  } else {
+                    Alert.alert('⚠️ Urgence partielle', 'Portes ouvertes mais erreur de verrouillage');
+                  }
+                } catch (error) {
+                  Alert.alert('⚠️ Urgence partielle', 'Portes ouvertes mais erreur de verrouillage');
+                }
+              } else {
+                Alert.alert('❌ Erreur', 'Impossible d\'activer l\'urgence');
               }
             }
           }
@@ -64,35 +93,24 @@ export function useEmergencyService() {
       return true;
     }
 
-    // Pour les utilisateurs normaux, on déclenche le verrouillage
-    Alert.alert(
-      'Verrouillage d\'urgence',
-      `Attention ! Cette action va verrouiller TOUS les utilisateurs de votre groupe (${user.ldapGroup}). Continuer ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Confirmer', 
-          style: 'destructive',
-          onPress: async () => {
-            const result = await emergencyService.triggerEmergencyLock(user.username);
-            
-            if (result.success) {
-              Alert.alert(
-                'Verrouillage activé',
-                result.message,
-                [{ text: 'Compris', onPress: signOut }]
-              );
-            } else {
-              // Vérifier si c'est une erreur de verrouillage
-              if (EmergencyService.handleLockError(result, signOut)) {
-                return;
-              }
-              Alert.alert('Erreur', result.message);
-            }
-          }
-        }
-      ]
-    );
+    // Pour les utilisateurs normaux, on déclenche le verrouillage directement
+    const result = await emergencyService.triggerEmergencyLock(user.username);
+    
+    if (result.success) {
+      Alert.alert(
+        'Verrouillage activé',
+        result.message,
+        [{ text: 'Compris', onPress: signOut }]
+      );
+    } else {
+      // Vérifier si c'est une erreur de verrouillage
+      if (EmergencyService.handleLockError(result, signOut)) {
+        return false;
+      }
+      Alert.alert('Erreur', result.message);
+      return false;
+    }
+    
     return true;
   }, [user, emergencyService, signOut, triggerEmergencyOpen]);
 

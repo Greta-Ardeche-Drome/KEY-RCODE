@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Logo from '../../assets/images/keyrcode-logo.png';
 import { useSession } from "../UserContext";
 import { useDarkMode } from '../DarkModeContext';
+import { useEmergencyService } from '../hooks/useEmergencyService';
 
 export default function Home() {
   // 1. TOUS LES HOOKS EN PREMIER (Ordre immuable)
@@ -12,18 +13,24 @@ export default function Home() {
   const { session, user, currentApiUrl, checkLockStatus, currentSite, apiChoice } = useSession();
   const pathname = usePathname();
   const { darkMode } = useDarkMode(); 
+  const { triggerEmergencyLock } = useEmergencyService();
   const [emergencyStep, setEmergencyStep] = React.useState(0);
-  const [emergencyLoading, setEmergencyLoading] = React.useState(false);
 
   // 2. VARIABLES ET LOGIQUE
   // Choix des styles en fonction du mode sombre
   const styles = darkMode ? darkStyles : lightStyles;
+  
+  // Extraire le nom court du groupe LDAP (ex: "Admins_Valence_IUT" depuis "CN=DL_KRC_Admins_Valence_IUT,OU=...")
+  const getShortGroupName = (ldapGroup: string | undefined): string => {
+    if (!ldapGroup) return 'N/A';
+    const match = ldapGroup.match(/CN=DL_KRC_([^,]+)/i);
+    return match ? match[1] : ldapGroup;
+  };
 
   useEffect(() => {
     if ((!session || !user || user.email === 'email@domaine.fr') && pathname !== '/login') {
       router.replace('/login');
     } else if (session && user && user.email !== 'email@domaine.fr') {
-      // Vérifier le statut de verrouillage lors du chargement
       checkLockStatus();
     }
   }, [session, user, pathname, checkLockStatus]);
@@ -35,44 +42,38 @@ export default function Home() {
   }
 
   // 4. FONCTIONS
-  const sendEmergencyRequest = async () => {
-    setEmergencyLoading(true);
-    try {
-      const response = await fetch(`${currentApiUrl}/emergency`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminId: user?.email ?? 'Utilisateur Inconnu' }),
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        alert('🚨 Urgence signalée ! Portes Ouvertes.');
-      } else {
-        alert(data.message || "Erreur lors de la demande d'urgence.");
-      }
-    } catch (error) {
-      alert('Erreur réseau : impossible de contacter le serveur.');
-    } finally {
-      setEmergencyStep(0);
-      setEmergencyLoading(false);
-    }
-  };
-
   const handleEmergencyPress = () => {
+    // Première presse : Activation du mode confirmation
     if (emergencyStep === 0) {
       setEmergencyStep(1);
-      setTimeout(() => setEmergencyStep(0), 5000); // Reset after 5s if not confirmed
+      // Réinitialisation automatique après 5 secondes
+      setTimeout(() => setEmergencyStep(0), 5000);
       return;
     }
-    // Show confirmation popup
+    
+    // Deuxième presse : Avertissement et confirmation finale
     if (emergencyStep === 1) {
-      Alert.alert(
-        'Confirmer Urgence',
-        'Êtes-vous sûr de vouloir signaler une urgence ?',
-        [
-          { text: 'Annuler', style: 'cancel', onPress: () => setEmergencyStep(0) },
-          { text: 'Oui', style: 'destructive', onPress: sendEmergencyRequest },
-        ]
-      );
+      setEmergencyStep(0); // Réinitialiser
+      
+      // Message d'avertissement différent selon le rôle
+      if (user?.role === 'admin') {
+        // Pour les admins, on appelle directement le hook qui gère sa propre confirmation
+        triggerEmergencyLock();
+      } else {
+        // Pour les utilisateurs normaux, on affiche l'avertissement sévère
+        Alert.alert(
+          '⚠️ AVERTISSEMENT SÉRIEUX',
+          "Déclencher une fausse alerte d'urgence est un acte grave qui peut :\n\n• Verrouiller TOUS les membres de votre groupe\n• Causer des perturbations majeures\n• Entraîner des sanctions disciplinaires\n• Vous rendre passible de poursuites\n\n🚨 N'utilisez cette fonction qu'en cas de véritable urgence !\n\nÊtes-vous sûr de continuer ?",
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { 
+              text: 'Confirmer l\'urgence', 
+              style: 'destructive',
+              onPress: () => triggerEmergencyLock()
+            }
+          ]
+        );
+      }
     }
   };
 
@@ -90,7 +91,7 @@ export default function Home() {
               <Text style={styles.userText}>
                 {user.username} {user.role === 'admin' && '• Admin'}
               </Text>
-              <Text style={styles.groupText}>Groupe: {user.ldapGroup}</Text>
+              <Text style={styles.groupText}>Groupe: {getShortGroupName(user.ldapGroup)}</Text>
               {apiChoice === 'OnPremises' && currentSite && (
                 <Text style={styles.groupText}>📍 Site: {currentSite}</Text>
               )}
@@ -121,12 +122,19 @@ export default function Home() {
           {/* Quick Links */}
           <View style={styles.quickLinks}>
             <TouchableOpacity
-              style={[styles.linkButton, { backgroundColor: '#ff4d4f', borderColor: '#ff4d4f', opacity: emergencyLoading ? 0.7 : 1 }]}
+              style={[
+                styles.linkButton, 
+                { 
+                  backgroundColor: emergencyStep === 1 ? '#dc2626' : '#ff4d4f', 
+                  borderColor: emergencyStep === 1 ? '#dc2626' : '#ff4d4f' 
+                }
+              ]}
               onPress={handleEmergencyPress}
-              disabled={emergencyLoading}
             >
               <Text style={[styles.linkIcon, { color: '#fff' }]}>🚨</Text>
-              <Text style={[styles.linkText, { color: '#fff' }]}>{emergencyStep === 1 ? 'Appuyez encore !' : 'Urgence'}</Text>
+              <Text style={[styles.linkText, { color: '#fff' }]}>
+                {emergencyStep === 1 ? 'Appuyez encore !' : 'Urgence'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity

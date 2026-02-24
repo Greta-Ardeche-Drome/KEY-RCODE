@@ -17,10 +17,19 @@ export interface UserLockInfo {
   resolvedAt?: string;
 }
 
+export interface GroupLockInfo {
+  ldap_group: string;
+  triggered_by: string;
+  triggered_at: string;
+  is_locked?: boolean; // Optionnel car l'API peut ne pas le retourner (présence = verrouillé)
+}
+
 export interface LockedUsersResponse {
   success: boolean;
   users: UserLockInfo[];
   count: number;
+  lockedGroups?: GroupLockInfo[];
+  totalGroupsLocked?: number;
 }
 
 export class EmergencyService {
@@ -184,14 +193,16 @@ export class EmergencyService {
    */
   async getLockedUsers(): Promise<LockedUsersResponse> {
     try {
-      const response = await this.makeRequest('/emergency/locked-users', 'GET');
+      const response = await this.makeRequest('/emergency/list', 'GET');
       const data = await response.json();
 
       if (response.ok) {
         return {
           success: true,
-          users: data.users || [],
-          count: data.count || 0
+          users: data.lockedUsers || [],
+          count: data.totalUsersLocked || 0,
+          lockedGroups: data.lockedGroups || [],
+          totalGroupsLocked: data.totalGroupsLocked || 0
         };
       } else {
         // Si l'endpoint n'existe pas encore, retourner des données mockées
@@ -201,7 +212,9 @@ export class EmergencyService {
         return {
           success: false,
           users: [],
-          count: 0
+          count: 0,
+          lockedGroups: [],
+          totalGroupsLocked: 0
         };
       }
     } catch (error) {
@@ -218,7 +231,9 @@ export class EmergencyService {
     return {
       success: true,
       users: [], // Liste vide - pas d'exemples
-      count: 0
+      count: 0,
+      lockedGroups: [],
+      totalGroupsLocked: 0
     };
   }
 
