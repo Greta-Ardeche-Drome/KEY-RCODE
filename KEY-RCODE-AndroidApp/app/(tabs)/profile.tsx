@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from "../UserContext";
@@ -7,7 +7,6 @@ import { useDarkMode } from '../DarkModeContext';
 export default function Profile() {
   // 1. TOUS LES HOOKS EN PREMIER (Ordre immuable)
   const [notifications, setNotifications] = useState(true);
-  const [saveHistory, setSaveHistory] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { signOut, user, session, isLocked, currentApiUrl, currentSite, apiChoice } = useSession();
   const { darkMode, setDarkMode } = useDarkMode();
@@ -40,6 +39,23 @@ export default function Profile() {
       ]
     );
   };
+
+  // Add a useEffect to handle notification toggling
+  useEffect(() => {
+    const toggleNotifications = async () => {
+      if (notifications) {
+        // Logic to enable notifications
+        console.log('Notifications enabled');
+        // Add your notification enabling logic here
+      } else {
+        // Logic to disable notifications
+        console.log('Notifications disabled');
+        // Add your notification disabling logic here
+      }
+    };
+
+    toggleNotifications();
+  }, [notifications]);
 
   // 3. UN SEUL RETURN UNIQUE (Pas de if/return au milieu)
   return (
@@ -101,12 +117,6 @@ export default function Profile() {
               <View style={theme.rowIconBg}><Text>🌙</Text></View>
               <Text style={theme.rowLabel}>Mode Sombre</Text>
               <Switch value={darkMode} onValueChange={setDarkMode} trackColor={{false: '#D1D5DB', true: '#3B82F6'}} />
-            </View>
-
-            <View style={theme.row}>
-              <View style={theme.rowIconBg}><Text>💾</Text></View>
-              <Text style={theme.rowLabel}>Historique local</Text>
-              <Switch value={saveHistory} onValueChange={setSaveHistory} trackColor={{false: '#D1D5DB', true: '#3B82F6'}} />
             </View>
           </View>
 
