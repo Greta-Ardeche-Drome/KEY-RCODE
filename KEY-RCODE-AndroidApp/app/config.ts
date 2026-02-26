@@ -8,7 +8,7 @@ export const CLOUD_API_URL = "https://api.keyrcode.app/api/v1";
 // Chaque site correspond à un groupe AD "DL_KRC_Users_{site}" / "DL_KRC_Admins_{site}"
 // et pointe vers son propre backend local.
 //
-// Convention DNS : localendpoint.<site>.keyrcode.app  →  résolu par le DNS Externe vers l'IP locale du serveur backend on-premises.
+// Convention DNS : {site}.localendpoint.keyrcode.app  →  résolu par le DNS Externe vers l'IP locale du serveur backend on-premises.
 // Le backend écoute sur le port 3000 en HTTPS.
 
 export interface SiteConfig {
@@ -36,14 +36,14 @@ export const KNOWN_SITES: SiteConfig[] = [
   // ── Exemples de sites supplémentaires ──────────────────────────
   // {
   //   name: "Paris",
-  //   apiUrl: "https://localendpoint.paris.keyrcode.app:3000/api/v1",
-  //   hostname: "localendpoint.paris.keyrcode.app",
+  //   apiUrl: "https://paris.localendpoint.keyrcode.app:3000/api/v1",
+  //   hostname: "paris.localendpoint.keyrcode.app",
   //   description: "Siège – Paris",
   // },
   // {
   //   name: "Lyon",
-  //   apiUrl: "https://localendpoint.lyon.keyrcode.app:3000/api/v1",
-  //   hostname: "localendpoint.lyon.keyrcode.app",
+  //   apiUrl: "https://lyon.localendpoint.keyrcode.app:3000/api/v1",
+  //   hostname: "lyon.localendpoint.keyrcode.app",
   //   description: "Agence – Lyon",
   // },
 ];
@@ -60,7 +60,7 @@ export const API_URLS: Record<string, string> = {
  * Résout l'URL de l'API backend pour un site donné.
  * Ordre de résolution :
  *  1. Correspondance exacte dans KNOWN_SITES
- *  2. Convention DNS : https://localendpoint.{site}.keyrcode.app:3000/api/v1
+ *  2. Convention DNS : https://{site}.localendpoint.keyrcode.app:3000/api/v1
  */
 export function resolveOnPremisesUrl(siteName: string): string {
   const known = KNOWN_SITES.find(
@@ -69,7 +69,7 @@ export function resolveOnPremisesUrl(siteName: string): string {
   if (known) return known.apiUrl;
 
   // Fallback : convention DNS basée sur le nom du site
-  return `https://localendpoint.${siteName.toLowerCase()}.keyrcode.app:3000/api/v1`;
+  return `https://${siteName.toLowerCase()}.localendpoint.keyrcode.app:3000/api/v1`;
 }
 
 /**
@@ -81,7 +81,7 @@ export function resolveOnPremisesHostname(siteName: string): string {
   );
   if (known) return known.hostname;
 
-  return `localendpoint.${siteName.toLowerCase()}.keyrcode.app`;
+  return `${siteName.toLowerCase()}.localendpoint.keyrcode.app`;
 }
 
 // ─── Auto-détection / probe du serveur ─────────────────────────────────
