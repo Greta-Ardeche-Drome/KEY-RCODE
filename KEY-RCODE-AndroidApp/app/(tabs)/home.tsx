@@ -28,15 +28,15 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if ((!session || !user || user.email === 'email@domaine.fr') && pathname !== '/login') {
+    if ((!session || !user) && pathname !== '/login') {
       router.replace('/login');
-    } else if (session && user && user.email !== 'email@domaine.fr') {
+    } else if (session && user) {
       checkLockStatus();
     }
   }, [session, user, pathname, checkLockStatus]);
 
   // 3. EARLY RETURN (Après les hooks)
-  if (!session || !user || user.email === 'email@domaine.fr') {
+  if (!session || !user) {
     // On attend la redirection, on peut afficher un écran vide ou un loader
     return <View style={{ flex: 1, backgroundColor: styles.container.backgroundColor }} />;
   }

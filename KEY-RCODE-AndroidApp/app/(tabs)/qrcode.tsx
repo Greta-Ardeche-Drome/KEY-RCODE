@@ -37,7 +37,7 @@ const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
           backgroundColor="#FFFFFF"
         />
       </View>
-      <Text style={styles.tokenText}>Token: {token}</Text>
+      {/* Token masqué pour des raisons de sécurité */}
     </View>
   );
 };
@@ -47,6 +47,8 @@ export default function Details() {
 
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [exitConfirm, setExitConfirm] = useState(false);
   const { session, user, currentApiUrl, signOut } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -54,18 +56,29 @@ export default function Details() {
   const styles = darkMode ? darkStyles : lightStyles;
 
   useEffect(() => {
-    if ((!session || !user || user.email === 'email@domaine.fr') && pathname !== '/login') {
+    if ((!session || !user) && pathname !== '/login') {
       router.replace('/login');
     }
   }, [session, user, pathname]);
 
-  const isDisconnected = !session || !user || user.email === 'email@domaine.fr';
+  // Gestion du cooldown timer
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    if (cooldown > 0) {
+      timer = setInterval(() => {
+        setCooldown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const isDisconnected = !session || !user;
 
   const generateToken = async () => {
     setIsLoading(true);
     try {
       const payload = {
-        userId: user?.email ?? '' 
+        userId: user?.email ?? ''
       };
       const response = await fetch(`${currentApiUrl}/generate`, {
         method: 'POST',
@@ -87,6 +100,7 @@ export default function Details() {
 
       if (response.ok && data.success) {
         setToken(data.token);
+        setCooldown(20); // 20 secondes d'attente avant de pouvoir en générer un nouveau
       } else {
         Alert.alert("Erreur", data.message || "Le serveur a refusé la demande.");
       }
@@ -102,16 +116,15 @@ export default function Details() {
     setIsLoading(true);
     try {
       // 2. On envoie l'ordre d'ouverture au serveur
-      // IP DU SERVEUR A REMPLACER CI-DESSOUS !
       const response = await fetch(`${currentApiUrl}/open-door`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session}`,
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userId: user?.email ?? '',
-          action: 'exit' 
+          action: 'exit'
         }),
       });
 
@@ -138,6 +151,19 @@ export default function Details() {
     }
   };
 
+  const handleDisconnectPress = () => {
+    if (exitConfirm) {
+      setExitConfirm(false);
+      disconnect();
+    } else {
+      setExitConfirm(true);
+      // Réinitialise la confirmation après 3 secondes si pas de second appui
+      setTimeout(() => {
+        setExitConfirm(false);
+      }, 3000);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {isDisconnected ? (
@@ -160,25 +186,42 @@ export default function Details() {
           {/* Boutons d'action */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
+              style={[
+                styles.button,
+                styles.primaryButton,
+                (isLoading || !!token || cooldown > 0) && { opacity: 0.5 }
+              ]}
               onPress={generateToken}
               activeOpacity={0.8}
-              disabled={isLoading}
+              disabled={isLoading || !!token || cooldown > 0}
             >
               {isLoading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>✨ Générer un QR Code</Text>
+                <Text style={styles.buttonText}>
+                  {token
+                    ? "QR Code Actif"
+                    : cooldown > 0
+                      ? `Attendre ${cooldown}s`
+                      : "✨ Générer un QR Code"}
+                </Text>
               )}
             </TouchableOpacity>
 
             {token && (
               <TouchableOpacity
-                style={[styles.button, styles.secondaryButton]}
-                onPress={disconnect}
+                style={[
+                  styles.button,
+                  styles.secondaryButton,
+                  exitConfirm && { backgroundColor: '#991B1B', borderColor: '#7F1D1D' }
+                ]}
+                onPress={handleDisconnectPress}
                 activeOpacity={0.8}
+                disabled={isLoading}
               >
-                <Text style={styles.secondaryButtonText}>🔄 Sortie</Text>
+                <Text style={styles.secondaryButtonText}>
+                  {exitConfirm ? "⚠️ Confirmer Sortie ?" : "🔄 Sortie"}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -230,7 +273,7 @@ const darkStyles = StyleSheet.create({
   qrContainer: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   qrWrapper: {
     padding: 20, backgroundColor: '#FFFFFF', /* Le fond du QR reste blanc pour qu'il soit lisible */
-    borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 1, height: 8 }, 
+    borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 1, height: 8 },
     shadowOpacity: 0.5, shadowRadius: 22, elevation: 10,
   },
   qrPlaceholder: {

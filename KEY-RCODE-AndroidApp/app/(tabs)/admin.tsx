@@ -38,7 +38,10 @@ export default function AdminPanel() {
   const [isUnlockingAll, setIsUnlockingAll] = useState(false);
   
   const styles = darkMode ? darkStyles : lightStyles;
-  const emergencyService = new EmergencyService(currentApiUrl, session || '');
+  const emergencyService = React.useMemo(
+    () => new EmergencyService(currentApiUrl, session || ''),
+    [currentApiUrl, session]
+  );
 
   // Redirection si pas admin ou pas connecté
   useEffect(() => {
@@ -436,8 +439,9 @@ export default function AdminPanel() {
         </View>
 
         {/* Section Super Admin - Déverrouillage Global */}
-        {(user.email?.toLowerCase().trim() === 'administrateur@krc' || 
-          user.username?.toLowerCase().trim() === 'administrateur') && (
+        {/* ⚠️ SÉCURITÉ : La vraie autorisation doit être vérifiée par le backend.
+            Ce check côté client n'est qu'un confort UI. */}
+        {user.role === 'admin' && (
           <View style={[styles.section, styles.superAdminSection]}>
             <View style={styles.superAdminHeader}>
               <Text style={styles.superAdminBadge}>👑 SUPER ADMIN</Text>

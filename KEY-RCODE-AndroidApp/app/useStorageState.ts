@@ -15,6 +15,9 @@ function useAsyncState<T>(
 
 export async function setStorageItemAsync(key: string, value: string | null) {
   if (Platform.OS === 'web') {
+    // ⚠️ SÉCURITÉ : localStorage n'est pas chiffré et vulnérable aux attaques XSS.
+    // En production, préférer une solution sécurisée (httpOnly cookies, etc.)
+    console.warn('[Security] Web platform: localStorage is not encrypted. Avoid storing sensitive tokens.');
     try {
       if (value === null) {
         localStorage.removeItem(key);

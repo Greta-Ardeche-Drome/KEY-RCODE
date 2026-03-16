@@ -17,7 +17,7 @@ export default function Profile() {
 
   // 2. LOGIQUE DE CALCUL (Après les hooks)
   const theme = darkMode ? darkStyles : lightStyles;
-  const isDisconnected = !session || !user || user.email === 'email@domaine.fr';
+  const isDisconnected = !session || !user;
 
   const handleLogout = () => {
     Alert.alert(
@@ -81,7 +81,7 @@ export default function Profile() {
               </Text>
             </View>
             <Text style={theme.username}>{user?.username || 'Utilisateur'}</Text>
-            <Text style={theme.email}>{user?.email || 'email@domaine.fr'}</Text>
+            <Text style={theme.email}>{user?.email || 'Non renseigné'}</Text>
             {session && (
               <View style={theme.badgeContainer}>
                 <Text style={theme.badgeText}>Connecté • Sécurisé</Text>

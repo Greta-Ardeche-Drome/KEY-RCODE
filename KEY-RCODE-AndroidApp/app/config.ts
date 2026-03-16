@@ -191,9 +191,12 @@ export async function autoDetectSites(
 }
 
 // ─── Hook (rétro-compatibilité) ────────────────────────────────────────
-export function useApiUrl() {
-  const { currentApiUrl } = require('./UserContext').useSession();
-  return currentApiUrl;
+// @deprecated — Utiliser directement `useSession().currentApiUrl` depuis UserContext
+// Ce hook utilisait un require() dynamique qui causait des risques de dépendance circulaire.
+export function useApiUrl(): string {
+  // Import dynamique supprimé pour éviter les dépendances circulaires.
+  // Les composants doivent utiliser useSession() directement.
+  throw new Error('useApiUrl() est déprécié. Utilisez useSession().currentApiUrl à la place.');
 }
 
 // On garde une valeur par défaut pour rétrocompatibilité

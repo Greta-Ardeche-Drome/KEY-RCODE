@@ -48,15 +48,16 @@ export default function Login() {
     try {
       const savedData = await SecureStore.getItemAsync('krc_remember_credentials');
       if (savedData) {
-        const { username: savedUsername, apiChoice: savedApiChoice, rememberMe: savedRemember } = JSON.parse(savedData);
+        const { username: savedUsername, password: savedPassword, apiChoice: savedApiChoice, rememberMe: savedRemember } = JSON.parse(savedData);
         if (savedRemember) {
           setUsername(savedUsername || '');
+          setPassword(savedPassword || '');
           setApiChoice(savedApiChoice || 'OnPremises');
           setRememberMe(true);
         }
       }
     } catch (error) {
-      // Erreur silencieuse
+      console.warn('[Remember Me] Erreur lors du chargement des identifiants:', error);
     }
   };
 
@@ -65,6 +66,7 @@ export default function Login() {
       if (rememberMe && username) {
         await SecureStore.setItemAsync('krc_remember_credentials', JSON.stringify({
           username,
+          password,
           apiChoice,
           rememberMe: true,
         }));
@@ -72,13 +74,13 @@ export default function Login() {
         await SecureStore.deleteItemAsync('krc_remember_credentials');
       }
     } catch (error) {
-      // Erreur silencieuse
+      console.warn('[Remember Me] Erreur lors de la sauvegarde des identifiants:', error);
     }
   };
   // ──────────────────────────────────────────────────
 
   useEffect(() => {
-    if (session && user && user.email !== 'email@domaine.fr') {
+    if (session && user) {
       router.replace('/(tabs)/home');
     }
   }, [session, user]);
@@ -126,17 +128,16 @@ export default function Login() {
           userEmail = userEmail[0] || `${username}@KRC`;
         }
         
-        // Détection admin plus robuste
+        // ⚠️ SÉCURITÉ : Le rôle doit être validé côté backend (JWT claims).
+        // Le check côté client n'est qu'un confort UI, pas une protection.
         const rawLdapGroups = data.user?.ldapGroups || data.user?.groups || [];
-        // LDAP peut retourner une chaîne si un seul groupe, ou un tableau si plusieurs
         const ldapGroups = Array.isArray(rawLdapGroups) ? rawLdapGroups : [rawLdapGroups];
         
-        const isAdminUser = username.toLowerCase() === 'administrateur' || 
+        const isAdminUser = data.user?.role === 'admin' ||
                            ldapGroups.some((group: string) => 
                              group.toLowerCase().includes('admin') || 
                              group.toLowerCase().includes('administrator')
-                           ) ||
-                           data.user?.role === 'admin';
+                           );
 
         // Extraction du site depuis les groupes LDAP (DL_KRC_Users_{site})
         const siteFromLdap = ldapGroups.reduce((found: string | undefined, group: string) => {
@@ -453,6 +454,11 @@ export default function Login() {
                           onPress={async () => {
                             const siteName = customSiteName.trim();
                             if (!siteName) return;
+                            // Validation : n'accepter que des caractères alphanumériques, tirets et underscores
+                            if (!/^[a-zA-Z0-9_-]+$/.test(siteName)) {
+                              Alert.alert('Erreur', 'Le nom du site ne doit contenir que des lettres, chiffres, tirets et underscores.');
+                              return;
+                            }
                             const customSite: SiteConfig = {
                               name: siteName,
                               apiUrl: resolveOnPremisesUrl(siteName),
@@ -555,10 +561,6 @@ export default function Login() {
                   {rememberMe && <Text style={styles.checkmark}>✓</Text>}
                 </View>
                 <Text style={[styles.rememberText, { color: theme.label }]}>Se souvenir de moi</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.forgotButton}>
-                <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
               </TouchableOpacity>
             </View>
 

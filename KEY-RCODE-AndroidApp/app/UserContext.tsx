@@ -1,7 +1,22 @@
-import React, { useContext, createContext, type PropsWithChildren, useState, useCallback } from 'react';
+import React, { useContext, createContext, type PropsWithChildren, useState, useCallback, useEffect } from 'react';
 import { useStorageState } from './useStorageState';
 import { API_URLS, CLOUD_API_URL, resolveOnPremisesUrl, KNOWN_SITES } from './config';
 import { Alert } from 'react-native';
+
+// ─── Utilitaire : vérification d'expiration JWT ─────────────────────
+function isTokenExpired(token: string | null | undefined): boolean {
+  if (!token) return true;
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return true;
+    // Décoder base64url → JSON
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    if (!decoded.exp) return false; // Pas de claim exp → on considère valide
+    return decoded.exp * 1000 < Date.now();
+  } catch {
+    return true; // Token malformé → considéré expiré
+  }
+}
 
 type UserData = { 
   username: string; 
@@ -65,6 +80,27 @@ export function UserProvider({ children }: PropsWithChildren) {
       ? resolveOnPremisesUrl(currentSite)
       : API_URLS.OnPremises;
 
+  // ─── Vérification périodique de l'expiration du token ────────────────
+  useEffect(() => {
+    if (!session) return;
+    const checkExpiry = () => {
+      if (isTokenExpired(session)) {
+        Alert.alert(
+          'Session expirée',
+          'Votre session a expiré. Veuillez vous reconnecter.',
+          [{ text: 'OK' }]
+        );
+        setSession(null);
+        setUser(null);
+        setApiChoice(null);
+        setStoredSite(null);
+      }
+    };
+    checkExpiry(); // Vérif immédiate
+    const interval = setInterval(checkExpiry, 60_000); // Toutes les 60s
+    return () => clearInterval(interval);
+  }, [session]);
+
   const signOut = useCallback(() => {
     setSession(null);
     setUser(null);
@@ -73,7 +109,7 @@ export function UserProvider({ children }: PropsWithChildren) {
     setIsLocked(false);
   }, [setSession, setApiChoice, setStoredSite]);
 
-  // Fonction pour déclencher le verrouillage d'urgence
+  // @deprecated — Utiliser useEmergencyService().triggerEmergencyLock() à la place
   const triggerEmergencyLock = useCallback(async (): Promise<boolean> => {
     if (!session || !user) {
       Alert.alert('Erreur', 'Vous devez être connecté pour déclencher le verrouillage d\'urgence.');
@@ -98,18 +134,16 @@ export function UserProvider({ children }: PropsWithChildren) {
           [{ text: 'Compris', onPress: signOut }]
         );
         return true;
-      } else if (response.status === 403) {
+      } else {
         const data = await response.json();
-        if (data.error === 'EMERGENCY_LOCKED') {
+        if (response.status === 403 && data.error === 'EMERGENCY_LOCKED') {
           setIsLocked(true);
           Alert.alert('Compte verrouillé', data.message);
           return false;
         }
+        Alert.alert('Erreur', data.error || 'Impossible de déclencher le verrouillage d\'urgence.');
+        return false;
       }
-      
-      const data = await response.json();
-      Alert.alert('Erreur', data.error || 'Impossible de déclencher le verrouillage d\'urgence.');
-      return false;
     } catch (error) {
       console.error('Erreur lors du verrouillage d\'urgence:', error);
       Alert.alert('Erreur réseau', 'Impossible de contacter le serveur.');
@@ -117,7 +151,7 @@ export function UserProvider({ children }: PropsWithChildren) {
     }
   }, [session, user, currentApiUrl, signOut]);
 
-  // Fonction pour déverrouiller un utilisateur (admin uniquement)
+  // @deprecated — Utiliser useEmergencyService().resetUserLock() à la place
   const resetUserLock = useCallback(async (targetUsername: string): Promise<boolean> => {
     if (!session || !user || user.role !== 'admin') {
       Alert.alert('Erreur', 'Seuls les administrateurs peuvent déverrouiller des comptes.');

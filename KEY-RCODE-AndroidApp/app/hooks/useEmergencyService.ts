@@ -1,7 +1,7 @@
 // hooks/useEmergencyService.ts
 // Hook personnalisé pour utiliser le service d'urgence dans les composants React
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
 import { useSession } from '../UserContext';
 import EmergencyService, { EmergencyResponse } from '../services/emergencyService';
@@ -9,8 +9,11 @@ import EmergencyService, { EmergencyResponse } from '../services/emergencyServic
 export function useEmergencyService() {
   const { session, user, currentApiUrl, signOut } = useSession();
 
-  // Instanciation du service avec les paramètres de l'utilisateur connecté
-  const emergencyService = new EmergencyService(currentApiUrl, session || '');
+  // Mémoriser l'instance pour éviter une recréation à chaque render
+  const emergencyService = useMemo(
+    () => new EmergencyService(currentApiUrl, session || ''),
+    [currentApiUrl, session]
+  );
 
   /**
    * Déclenche une ouverture d'urgence classique (toutes les portes)
