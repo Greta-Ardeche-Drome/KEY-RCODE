@@ -1,17 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Text, View, StyleSheet, TouchableOpacity, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useSession } from ".././UserContext";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter, usePathname, useFocusEffect } from "expo-router";
 import { useDarkMode } from '../DarkModeContext'; // Corrected import
 import EmergencyService from '../services/emergencyService';
+import * as Brightness from 'expo-brightness';
+
+const QR_EXPIRY_SECONDS = 300; // 5 minutes
+
+const formatExpiry = (seconds: number): string => {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = (seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+};
 
 type QRCodeGeneratorProps = {
   token: string;
+  timeLeft: number;
 };
 
 // --- COMPOSANT: Générateur de QR Code ---
-const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
+const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token, timeLeft }) => {
   // On récupère le mode sombre et on choisit la bonne feuille de style
   const { darkMode } = useDarkMode();
   const styles = darkMode ? darkStyles : lightStyles;
@@ -26,8 +36,16 @@ const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
     );
   }
 
+  const isExpiringSoon = timeLeft <= 60;
+
   return (
     <View style={styles.qrContainer}>
+      {/* Bandeau de sécurité */}
+      <View style={[styles.lockBanner, isExpiringSoon && styles.lockBannerWarning]}>
+        <Text style={styles.lockBannerText}>
+          🔒 QR Code Actif — Écran protégé
+        </Text>
+      </View>
       <View style={styles.qrWrapper}>
         {/* On force le QR Code en noir sur fond blanc pour qu'il soit toujours bien scannable */}
         <QRCode
@@ -37,7 +55,12 @@ const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
           backgroundColor="#FFFFFF"
         />
       </View>
-      {/* Token masqué pour des raisons de sécurité */}
+      {/* Compte à rebours d'expiration */}
+      <View style={[styles.expiryBadge, isExpiringSoon && styles.expiryBadgeWarning]}>
+        <Text style={[styles.expiryText, isExpiringSoon && styles.expiryTextWarning]}>
+          ⏱ Expire dans : {formatExpiry(timeLeft)}
+        </Text>
+      </View>
     </View>
   );
 };
@@ -46,9 +69,12 @@ const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
 export default function Details() {
 
   const [token, setToken] = useState('');
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [exitConfirm, setExitConfirm] = useState(false);
+  const originalBrightness = useRef<number>(-1);
   const { session, user, currentApiUrl, signOut } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -71,6 +97,62 @@ export default function Details() {
     }
     return () => clearInterval(timer);
   }, [cooldown]);
+
+  // Compte à rebours expiration QR (toutes les 500ms pour précision)
+  useEffect(() => {
+    if (!tokenExpiresAt) return;
+    const timer = setInterval(() => {
+      const remaining = Math.ceil((tokenExpiresAt - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setToken('');
+        setTokenExpiresAt(null);
+        setTimeLeft(0);
+        Brightness.getBrightnessAsync()
+          .then(() => {
+            if (originalBrightness.current >= 0) {
+              Brightness.setBrightnessAsync(originalBrightness.current).catch(() => {});
+            }
+          })
+          .catch(() => {});
+        Alert.alert("QR Code expiré", "Votre QR Code a expiré après 5 minutes.");
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 500);
+    return () => clearInterval(timer);
+  }, [tokenExpiresAt]);
+
+  // Luminosité 100% quand QR actif, restauration à la désactivation
+  useEffect(() => {
+    if (token) {
+      Brightness.getBrightnessAsync()
+        .then((b) => {
+          originalBrightness.current = b;
+          return Brightness.setBrightnessAsync(1.0);
+        })
+        .catch(() => {});
+    } else {
+      if (originalBrightness.current >= 0) {
+        Brightness.setBrightnessAsync(originalBrightness.current).catch(() => {});
+      }
+    }
+  }, [token]);
+
+  // Expiration automatique du QR si l'utilisateur quitte la page
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (token) {
+          setToken('');
+          setTokenExpiresAt(null);
+          setTimeLeft(0);
+          if (originalBrightness.current >= 0) {
+            Brightness.setBrightnessAsync(originalBrightness.current).catch(() => {});
+          }
+        }
+      };
+    }, [token])
+  );
 
   const isDisconnected = !session || !user;
 
@@ -100,6 +182,8 @@ export default function Details() {
 
       if (response.ok && data.success) {
         setToken(data.token);
+        setTokenExpiresAt(Date.now() + QR_EXPIRY_SECONDS * 1000);
+        setTimeLeft(QR_EXPIRY_SECONDS);
         setCooldown(20); // 20 secondes d'attente avant de pouvoir en générer un nouveau
       } else {
         Alert.alert("Erreur", data.message || "Le serveur a refusé la demande.");
@@ -181,7 +265,7 @@ export default function Details() {
           </View>
 
           {/* Zone QR Code */}
-          <QRCodeGenerator token={token} />
+          <QRCodeGenerator token={token} timeLeft={timeLeft} />
 
           {/* Boutons d'action */}
           <View style={styles.buttonContainer}>
@@ -261,6 +345,20 @@ const lightStyles = StyleSheet.create({
   secondaryButton: { backgroundColor: '#FF0000', borderWidth: 2, borderColor: '#E5E7EB' },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   secondaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  lockBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#22C55E', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16,
+    marginBottom: 12, width: '100%',
+  },
+  lockBannerWarning: { backgroundColor: '#F59E0B' },
+  lockBannerText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  expiryBadge: {
+    marginTop: 14, backgroundColor: '#ECFDF5', borderRadius: 8,
+    paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#22C55E',
+  },
+  expiryBadgeWarning: { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' },
+  expiryText: { fontSize: 14, color: '#15803D', fontWeight: '600' },
+  expiryTextWarning: { color: '#92400E' },
 });
 
 // --- STYLES SOMBRES ---
@@ -294,4 +392,18 @@ const darkStyles = StyleSheet.create({
   secondaryButton: { backgroundColor: '#7F1D1D', borderWidth: 2, borderColor: '#991B1B' },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   secondaryButtonText: { color: '#FECACA', fontSize: 16, fontWeight: '600' },
+  lockBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#16A34A', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16,
+    marginBottom: 12, width: '100%',
+  },
+  lockBannerWarning: { backgroundColor: '#B45309' },
+  lockBannerText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  expiryBadge: {
+    marginTop: 14, backgroundColor: '#14532D', borderRadius: 8,
+    paddingVertical: 6, paddingHorizontal: 14, borderWidth: 1, borderColor: '#16A34A',
+  },
+  expiryBadgeWarning: { backgroundColor: '#78350F', borderColor: '#B45309' },
+  expiryText: { fontSize: 14, color: '#4ADE80', fontWeight: '600' },
+  expiryTextWarning: { color: '#FCD34D' },
 });

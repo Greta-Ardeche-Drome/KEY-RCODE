@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "QR-KEY",
+    "name": "KeyRCode",
     "slug": "QR-KEY",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -39,7 +39,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-brightness"
     ],
     "experiments": {
       "typedRoutes": true,

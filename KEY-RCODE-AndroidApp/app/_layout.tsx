@@ -5,10 +5,14 @@ import { View, ActivityIndicator } from 'react-native';
 import { DarkModeProvider } from './DarkModeContext';
 import AnimatedSplashScreen from './components/AnimatedSplashScreen';
 import * as SplashScreen from 'expo-splash-screen';
+import * as ScreenCapture from 'expo-screen-capture';
 
 // Empêche le splash screen natif de disparaître automatiquement 
 // pendant que l'on charge les assets et les sessions
 SplashScreen.preventAutoHideAsync();
+
+// Interdiction globale des captures d'écran dans toute l'application
+ScreenCapture.preventScreenCaptureAsync();
 
 // Désactivation des logs console en production
 if (!__DEV__) {
