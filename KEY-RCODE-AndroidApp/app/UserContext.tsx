@@ -18,11 +18,14 @@ function isTokenExpired(token: string | null | undefined): boolean {
   }
 }
 
-type UserData = { 
-  username: string; 
-  email: string; 
-  domain: string; 
-  role: 'admin' | 'user';
+// L1 : le backend renvoie 'superadmin' | 'siteadmin' | null (non-admin)
+type UserRole = 'superadmin' | 'siteadmin' | 'user';
+
+type UserData = {
+  username: string;
+  email: string;
+  domain: string;
+  role: UserRole;
   ldapGroup: string;
   /** Site AD auquel appartient l'utilisateur (ex: "Paris") */
   site?: string;
@@ -30,7 +33,7 @@ type UserData = {
 type ApiChoice = 'OnPremises' | 'Cloud';
 
 const AuthContext = createContext<{
-  signIn: (token: string, userData: UserData, apiChoice: ApiChoice, site?: string) => void;
+  signIn: (token: string, refreshToken: string | null, userData: UserData, apiChoice: ApiChoice, site?: string) => void;
   signOut: () => void;
   session?: string | null;
   isLoading: boolean;
@@ -45,7 +48,7 @@ const AuthContext = createContext<{
   checkLockStatus: () => Promise<void>;
 }>({
   signIn: () => null,
-  signOut: () => null,
+  signOut: () => {},
   session: null,
   isLoading: false,
   user: null,
@@ -64,6 +67,7 @@ export function useSession() {
 
 export function UserProvider({ children }: PropsWithChildren) {
   const [[isLoading, session], setSession] = useStorageState('session_token');
+  const [[, storedRefreshToken], setStoredRefreshToken] = useStorageState('krc_refresh_token');
   const [[, apiChoice], setApiChoice] = useStorageState('api_choice');
   const [[, storedSite], setStoredSite] = useStorageState('krc_site');
   const [user, setUser] = useState<UserData | null>(null);
@@ -81,33 +85,60 @@ export function UserProvider({ children }: PropsWithChildren) {
       : API_URLS.OnPremises;
 
   // ─── Vérification périodique de l'expiration du token ────────────────
+  // M6 : tentative de rafraîchissement silencieux avant de forcer la déconnexion.
   useEffect(() => {
     if (!session) return;
     const checkExpiry = () => {
-      if (isTokenExpired(session)) {
-        Alert.alert(
-          'Session expirée',
-          'Votre session a expiré. Veuillez vous reconnecter.',
-          [{ text: 'OK' }]
-        );
+      if (!isTokenExpired(session)) return;
+      if (storedRefreshToken) {
+        fetch(`${currentApiUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: storedRefreshToken }),
+        })
+          .then(r => r.ok ? r.json() : Promise.reject(r.status))
+          .then(data => { setSession(data.token); })
+          .catch(() => {
+            Alert.alert('Session expirée', 'Votre session a expiré. Veuillez vous reconnecter.', [{ text: 'OK' }]);
+            setSession(null);
+            setUser(null);
+            setApiChoice(null);
+            setStoredSite(null);
+            setStoredRefreshToken(null);
+            setIsLocked(false);
+          });
+      } else {
+        Alert.alert('Session expirée', 'Votre session a expiré. Veuillez vous reconnecter.', [{ text: 'OK' }]);
         setSession(null);
         setUser(null);
         setApiChoice(null);
         setStoredSite(null);
+        setIsLocked(false);
       }
     };
-    checkExpiry(); // Vérif immédiate
-    const interval = setInterval(checkExpiry, 60_000); // Toutes les 60s
+    checkExpiry();
+    const interval = setInterval(checkExpiry, 60_000);
     return () => clearInterval(interval);
-  }, [session]);
+  }, [session, storedRefreshToken, currentApiUrl]);
 
   const signOut = useCallback(() => {
+    const rt = storedRefreshToken;
+    const logoutUrl = `${currentApiUrl}/auth/logout`;
     setSession(null);
     setUser(null);
     setApiChoice(null);
     setStoredSite(null);
+    setStoredRefreshToken(null);
     setIsLocked(false);
-  }, [setSession, setApiChoice, setStoredSite]);
+    // M6 : révocation côté serveur (fire-and-forget — Redis TTL 8h si échoue)
+    if (rt) {
+      fetch(logoutUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: rt }),
+      }).catch(() => {});
+    }
+  }, [setSession, setApiChoice, setStoredSite, setStoredRefreshToken, storedRefreshToken, currentApiUrl]);
 
   // @deprecated — Utiliser useEmergencyService().triggerEmergencyLock() à la place
   const triggerEmergencyLock = useCallback(async (): Promise<boolean> => {
@@ -153,7 +184,7 @@ export function UserProvider({ children }: PropsWithChildren) {
 
   // @deprecated — Utiliser useEmergencyService().resetUserLock() à la place
   const resetUserLock = useCallback(async (targetUsername: string): Promise<boolean> => {
-    if (!session || !user || user.role !== 'admin') {
+    if (!session || !user || (user.role !== 'superadmin' && user.role !== 'siteadmin')) {
       Alert.alert('Erreur', 'Seuls les administrateurs peuvent déverrouiller des comptes.');
       return false;
     }
@@ -220,8 +251,9 @@ export function UserProvider({ children }: PropsWithChildren) {
   return (
     <AuthContext.Provider
       value={{
-        signIn: (token, userData, apiChoice, site) => {
+        signIn: (token, refreshToken, userData, apiChoice, site) => {
           setSession(token);
+          setStoredRefreshToken(refreshToken ?? null);
           setUser(userData);
           setApiChoice(apiChoice);
           setStoredSite(site || null);

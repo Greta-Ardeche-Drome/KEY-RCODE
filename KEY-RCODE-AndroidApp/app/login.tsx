@@ -48,10 +48,10 @@ export default function Login() {
     try {
       const savedData = await SecureStore.getItemAsync('krc_remember_credentials');
       if (savedData) {
-        const { username: savedUsername, password: savedPassword, apiChoice: savedApiChoice, rememberMe: savedRemember } = JSON.parse(savedData);
+        const { username: savedUsername, apiChoice: savedApiChoice, rememberMe: savedRemember } = JSON.parse(savedData);
         if (savedRemember) {
           setUsername(savedUsername || '');
-          setPassword(savedPassword || '');
+          // M6 : le mot de passe n'est plus stocké — l'utilisateur doit le ressaisir.
           setApiChoice(savedApiChoice || 'OnPremises');
           setRememberMe(true);
         }
@@ -64,9 +64,9 @@ export default function Login() {
   const saveCredentials = async () => {
     try {
       if (rememberMe && username) {
+        // M6 : stocker uniquement le nom d'utilisateur — jamais le mot de passe AD.
         await SecureStore.setItemAsync('krc_remember_credentials', JSON.stringify({
           username,
-          password,
           apiChoice,
           rememberMe: true,
         }));
@@ -133,11 +133,9 @@ export default function Login() {
         const rawLdapGroups = data.user?.ldapGroups || data.user?.groups || [];
         const ldapGroups = Array.isArray(rawLdapGroups) ? rawLdapGroups : [rawLdapGroups];
         
-        const isAdminUser = data.user?.role === 'admin' ||
-                           ldapGroups.some((group: string) => 
-                             group.toLowerCase().includes('admin') || 
-                             group.toLowerCase().includes('administrator')
-                           );
+        // L1 : le backend renvoie superadmin/siteadmin/null ; on s'y fie directement.
+        const backendRole = data.user?.role;
+        const isAdminUser = backendRole === 'superadmin' || backendRole === 'siteadmin';
 
         // Extraction du site depuis les groupes LDAP (DL_KRC_Users_{site})
         const siteFromLdap = ldapGroups.reduce((found: string | undefined, group: string) => {
@@ -146,18 +144,24 @@ export default function Login() {
           return match ? match[1] : undefined;
         }, undefined);
 
+        const preferredLdapGroup = ldapGroups.find((group) => /CN=DL_KRC_(?:Users|Admins)_.+/i.test(group))
+          ?? ldapGroups[0]
+          ?? data.user?.group
+          ?? data.user?.ldapGroup;
+
+        const resolvedSite = siteFromLdap || (apiChoice === 'OnPremises' ? selectedSite?.name : undefined);
+
         const userData = {
           username: username,
           email: userEmail,
           domain: data.user?.domain || 'KRC',
-          role: isAdminUser ? 'admin' as const : 'user' as const,
-          ldapGroup: Array.isArray(ldapGroups) && ldapGroups.length > 0 
-            ? ldapGroups[0] 
-            : (data.user?.group || data.user?.ldapGroup || `DL_KRC_Users_${siteFromLdap || selectedSite?.name || 'DefaultSite'}`),
-          site: siteFromLdap || (apiChoice === 'OnPremises' ? selectedSite?.name : undefined),
+          role: (isAdminUser ? (backendRole as 'superadmin' | 'siteadmin') : 'user') as const,
+          ldapGroup: preferredLdapGroup || `DL_KRC_Users_${resolvedSite || 'DefaultSite'}`,
+          site: resolvedSite,
         };
 
-        signIn(token, userData, apiChoice, apiChoice === 'OnPremises' ? selectedSite?.name : undefined);
+        // M6 : passer le refreshToken pour le stockage sécurisé (jamais le mot de passe).
+        signIn(token, data.refreshToken || null, userData, apiChoice, resolvedSite);
         
         // ✅ Sauvegarder les identifiants si Remember Me
         await saveCredentials();

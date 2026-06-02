@@ -50,7 +50,7 @@ export default function AdminPanel() {
       return;
     }
     
-    if (user.role !== 'admin') {
+    if (user.role !== 'superadmin' && user.role !== 'siteadmin') {
       Alert.alert(
         'Accès refusé',
         'Cette section est réservée aux administrateurs.',
@@ -200,7 +200,7 @@ export default function AdminPanel() {
   };
 
   // Ne pas afficher si pas admin
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'superadmin' && user.role !== 'siteadmin')) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.unauthorizedContainer}>
@@ -441,7 +441,7 @@ export default function AdminPanel() {
         {/* Section Super Admin - Déverrouillage Global */}
         {/* ⚠️ SÉCURITÉ : La vraie autorisation doit être vérifiée par le backend.
             Ce check côté client n'est qu'un confort UI. */}
-        {user.role === 'admin' && (
+        {user.role === 'superadmin' && (
           <View style={[styles.section, styles.superAdminSection]}>
             <View style={styles.superAdminHeader}>
               <Text style={styles.superAdminBadge}>👑 SUPER ADMIN</Text>

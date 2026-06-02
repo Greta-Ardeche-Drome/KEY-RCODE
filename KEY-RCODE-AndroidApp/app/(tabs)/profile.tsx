@@ -12,7 +12,7 @@ export default function Profile() {
   const { darkMode, setDarkMode } = useDarkMode();
   
   // Variables dérivées
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'siteadmin';
   const emergencyLock = { isLocked };
 
   // 2. LOGIQUE DE CALCUL (Après les hooks)

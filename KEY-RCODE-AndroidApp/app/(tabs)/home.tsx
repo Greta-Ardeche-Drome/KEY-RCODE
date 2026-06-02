@@ -56,7 +56,7 @@ export default function Home() {
       setEmergencyStep(0); // Réinitialiser
       
       // Message d'avertissement différent selon le rôle
-      if (user?.role === 'admin') {
+      if (user?.role === 'superadmin' || user?.role === 'siteadmin') {
         // Pour les admins, on appelle directement le hook qui gère sa propre confirmation
         triggerEmergencyLock();
       } else {
@@ -89,7 +89,7 @@ export default function Home() {
           {user && (
             <View style={styles.userInfo}>
               <Text style={styles.userText}>
-                {user.username} {user.role === 'admin' && '• Admin'}
+                {user.username} {(user.role === 'superadmin' || user.role === 'siteadmin') && '• Admin'}
               </Text>
               <Text style={styles.groupText}>Groupe: {getShortGroupName(user.ldapGroup)}</Text>
               {apiChoice === 'OnPremises' && currentSite && (

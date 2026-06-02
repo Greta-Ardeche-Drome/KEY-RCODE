@@ -10,7 +10,7 @@ export default function TabLayout() {
   const { user } = useSession();
   
   // Déterminer si l'utilisateur est admin
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'siteadmin';
 
   const tabBarStyle = {
     backgroundColor: darkMode ? '#23232b' : '#FFFFFF',
