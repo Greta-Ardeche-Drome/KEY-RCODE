@@ -19,7 +19,8 @@
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
-      "package": "com.crolh.QRKEY"
+      "package": "com.crolh.QRKEY",
+      "versionCode": 4
     },
     "web": {
       "output": "static",

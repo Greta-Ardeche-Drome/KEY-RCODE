@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useId } from "react";
 import Svg, {
   Defs,
   G,
@@ -23,16 +23,19 @@ const renderLogo = ({
   logoColor,
   logoMargin,
   logoBorderRadius,
+  clipPathId
 }) => {
   const logoPosition = (size - logoSize - logoMargin * 2) / 2;
   const logoBackgroundSize = logoSize + logoMargin * 2;
   const logoBackgroundBorderRadius =
     logoBorderRadius + (logoMargin / logoSize) * logoBorderRadius;
-
+  const clipLogoBackgroundId = `clip-logo-background-${clipPathId}`;
+  const clipLogoId = `clip-logo-${clipPathId}`;
+  
   return (
     <G x={logoPosition} y={logoPosition}>
       <Defs>
-        <ClipPath id="clip-logo-background">
+        <ClipPath id={clipLogoBackgroundId}>
           <Rect
             width={logoBackgroundSize}
             height={logoBackgroundSize}
@@ -40,7 +43,7 @@ const renderLogo = ({
             ry={logoBackgroundBorderRadius}
           />
         </ClipPath>
-        <ClipPath id="clip-logo">
+        <ClipPath id={clipLogoId}>
           <Rect
             width={logoSize}
             height={logoSize}
@@ -54,10 +57,10 @@ const renderLogo = ({
           width={logoBackgroundSize}
           height={logoBackgroundSize}
           fill={backgroundColor}
-          clipPath="url(#clip-logo-background)"
+          clipPath={`url(#${clipLogoBackgroundId})`}
         />
       </G>
-      <G x={logoMargin} y={logoMargin} clipPath="url(#clip-logo)">
+      <G x={logoMargin} y={logoMargin} clipPath={`url(#${clipLogoId})`}>
         <Rect
           width={logoBackgroundSize - logoMargin}
           height={logoBackgroundSize - logoMargin}
@@ -71,7 +74,7 @@ const renderLogo = ({
             height={logoSize}
             preserveAspectRatio="xMidYMid slice"
             href={logo}
-            clipPath="url(#clip-logo)"
+            clipPath={`url(#${clipLogoId})`}
           />
         )}
       </G>
@@ -100,6 +103,8 @@ const QRCode = ({
   onError,
   testID,
 }) => {
+  const clipPathId = useId();
+
   const result = useMemo(() => {
     try {
       return transformMatrixIntoPath(genMatrix(value, ecl), size);
@@ -173,6 +178,7 @@ const QRCode = ({
           logoColor,
           logoMargin,
           logoBorderRadius,
+          clipPathId,
         })}
     </Svg>
   );
