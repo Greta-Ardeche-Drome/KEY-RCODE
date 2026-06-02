@@ -115,17 +115,12 @@ export default function Details() {
   const disconnect = async () => {
     setIsLoading(true);
     try {
-      // 2. On envoie l'ordre d'ouverture au serveur
-      const response = await fetch(`${currentApiUrl}/open-door`, {
+      const response = await fetch(`${currentApiUrl}/relay/exit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session}`,
         },
-        body: JSON.stringify({
-          userId: user?.email ?? '',
-          action: 'exit'
-        }),
       });
 
       if (response.status === 403) {
@@ -139,8 +134,13 @@ export default function Details() {
 
       if (response.ok) {
         Alert.alert("Sortie autorisée", "La porte est ouverte. Au revoir ! 👋");
+      } else if (response.status === 404) {
+        Alert.alert(
+          "Aucune entrée connue",
+          "Approchez-vous du lecteur et scannez d'abord votre QR code pour entrer."
+        );
       } else {
-        Alert.alert("Erreur", "Impossible d'ouvrir la porte automatiquement.");
+        Alert.alert("Erreur", data.message || "Impossible d'ouvrir la porte automatiquement.");
       }
     } catch (error) {
       console.error(error);
