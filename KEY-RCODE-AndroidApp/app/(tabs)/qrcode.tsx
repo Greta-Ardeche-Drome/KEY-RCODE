@@ -1,20 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { Text, View, StyleSheet, TouchableOpacity, SafeAreaView, Alert, ActivityIndicator, Animated } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useSession } from ".././UserContext";
 import { useRouter, usePathname } from "expo-router";
-import { useDarkMode } from '../DarkModeContext'; // Corrected import
+import { useDarkMode } from '../DarkModeContext';
 import EmergencyService from '../services/emergencyService';
+
+const TOKEN_DURATION = 300; // 5 minutes
 
 type QRCodeGeneratorProps = {
   token: string;
+  borderAnim: Animated.Value;
+  timeLeft: number;
 };
 
 // --- COMPOSANT: Générateur de QR Code ---
-const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
-  // On récupère le mode sombre et on choisit la bonne feuille de style
+const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token, borderAnim, timeLeft }) => {
   const { darkMode } = useDarkMode();
   const styles = darkMode ? darkStyles : lightStyles;
+
+  const animatedBorderColor = borderAnim.interpolate({
+    inputRange: [0, 60, 120, 180, TOKEN_DURATION],
+    outputRange: ['#EF4444', '#EF4444', '#F97316', '#EAB308', '#32CF75'],
+  });
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
 
   if (!token) {
     return (
@@ -28,16 +42,17 @@ const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ token }) => {
 
   return (
     <View style={styles.qrContainer}>
-      <View style={styles.qrWrapper}>
-        {/* On force le QR Code en noir sur fond blanc pour qu'il soit toujours bien scannable */}
+      <Animated.View style={[styles.qrWrapper, { borderWidth: 4, borderColor: animatedBorderColor }]}>
         <QRCode
           value={token}
           size={220}
           color="#000000"
           backgroundColor="#FFFFFF"
         />
-      </View>
-      {/* Token masqué pour des raisons de sécurité */}
+      </Animated.View>
+      <Animated.Text style={[styles.timerText, { color: animatedBorderColor }]}>
+        ⏱ {formatTime(timeLeft)}
+      </Animated.Text>
     </View>
   );
 };
@@ -49,6 +64,9 @@ export default function Details() {
   const [isLoading, setIsLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [exitConfirm, setExitConfirm] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(TOKEN_DURATION);
+  const borderAnim = useRef(new Animated.Value(TOKEN_DURATION)).current;
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { session, user, currentApiUrl, signOut } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -71,6 +89,50 @@ export default function Details() {
     }
     return () => clearInterval(timer);
   }, [cooldown]);
+
+  // Animation du contour et countdown quand un token est actif
+  useEffect(() => {
+    if (token) {
+      borderAnim.setValue(TOKEN_DURATION);
+      setTimeLeft(TOKEN_DURATION);
+
+      Animated.timing(borderAnim, {
+        toValue: 0,
+        duration: TOKEN_DURATION * 1000,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) {
+          setToken('');
+          Alert.alert('QR Code expiré', 'Votre QR code n\'est plus valide. Générez-en un nouveau.');
+        }
+      });
+
+      timerRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current!);
+            timerRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      borderAnim.stopAnimation();
+      borderAnim.setValue(TOKEN_DURATION);
+      setTimeLeft(TOKEN_DURATION);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [token]);
 
   const isDisconnected = !session || !user;
 
@@ -100,7 +162,7 @@ export default function Details() {
 
       if (response.ok && data.success) {
         setToken(data.token);
-        setCooldown(20); // 20 secondes d'attente avant de pouvoir en générer un nouveau
+        setCooldown(20);
       } else {
         Alert.alert("Erreur", data.message || "Le serveur a refusé la demande.");
       }
@@ -157,7 +219,6 @@ export default function Details() {
       disconnect();
     } else {
       setExitConfirm(true);
-      // Réinitialise la confirmation après 3 secondes si pas de second appui
       setTimeout(() => {
         setExitConfirm(false);
       }, 3000);
@@ -181,7 +242,7 @@ export default function Details() {
           </View>
 
           {/* Zone QR Code */}
-          <QRCodeGenerator token={token} />
+          <QRCodeGenerator token={token} borderAnim={borderAnim} timeLeft={timeLeft} />
 
           {/* Boutons d'action */}
           <View style={styles.buttonContainer}>
@@ -248,10 +309,7 @@ const lightStyles = StyleSheet.create({
     alignItems: 'center', padding: 30, borderWidth: 2, borderColor: '#000000', borderStyle: 'dashed',
   },
   placeholderText: { fontSize: 16, color: '#9CA3AF', textAlign: 'center', lineHeight: 24 },
-  tokenText: {
-    marginTop: 20, fontSize: 12, color: '#32CF75', fontFamily: 'monospace',
-    backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, overflow: 'hidden',
-  },
+  timerText: { marginTop: 16, fontSize: 18, fontWeight: '700', fontFamily: 'monospace', letterSpacing: 1 },
   buttonContainer: { width: '100%', gap: 12 },
   button: { width: '100%', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   primaryButton: {
@@ -272,7 +330,7 @@ const darkStyles = StyleSheet.create({
   subtitle: { fontSize: 16, color: '#60A5FA', textAlign: 'center' },
   qrContainer: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   qrWrapper: {
-    padding: 20, backgroundColor: '#FFFFFF', /* Le fond du QR reste blanc pour qu'il soit lisible */
+    padding: 20, backgroundColor: '#FFFFFF',
     borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 1, height: 8 },
     shadowOpacity: 0.5, shadowRadius: 22, elevation: 10,
   },
@@ -281,10 +339,7 @@ const darkStyles = StyleSheet.create({
     alignItems: 'center', padding: 30, borderWidth: 2, borderColor: '#4B5563', borderStyle: 'dashed',
   },
   placeholderText: { fontSize: 16, color: '#D1D5DB', textAlign: 'center', lineHeight: 24 },
-  tokenText: {
-    marginTop: 20, fontSize: 12, color: '#4ADE80', fontFamily: 'monospace',
-    backgroundColor: '#374151', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, overflow: 'hidden',
-  },
+  timerText: { marginTop: 16, fontSize: 18, fontWeight: '700', fontFamily: 'monospace', letterSpacing: 1 },
   buttonContainer: { width: '100%', gap: 12 },
   button: { width: '100%', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   primaryButton: {
